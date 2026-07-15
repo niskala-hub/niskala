@@ -1,12 +1,36 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import heroBg from "@/assets/hero-bg.jpg";
 import coreCollection from "@/assets/collections/core-collection.jpg";
 import setsAndPairs from "@/assets/collections/sets-and-pairs.jpg";
 import NewsletterSignup from "@/components/NewsletterSignup";
-import { featuredProducts } from "@/data/products";
+import { featuredProducts as fallbackFeatured } from "@/data/products";
 import { formatIDR } from "@/lib/currency";
+import { supabase } from "@/integrations/supabase/client";
+import { resolveProductImage } from "@/lib/productImage";
+
+interface DBProduct { slug: string; name: string; price: number; image_url: string | null; }
+interface DBCategory { id: string; slug: string; name: string; }
 
 export default function Index() {
+  const [dbProducts, setDbProducts] = useState<DBProduct[] | null>(null);
+  const [dbCategories, setDbCategories] = useState<DBCategory[]>([]);
+
+  useEffect(() => {
+    supabase.from("products").select("slug,name,price,image_url").order("created_at", { ascending: false }).limit(3)
+      .then(({ data }) => setDbProducts(data || []));
+    supabase.from("categories").select("id,slug,name").order("name")
+      .then(({ data }) => setDbCategories(data || []));
+  }, []);
+
+  const featured = dbProducts && dbProducts.length > 0
+    ? dbProducts.map((p, i) => ({
+        slug: p.slug,
+        name: p.name,
+        price: Number(p.price),
+        image: resolveProductImage(p.image_url, i % 2 === 0 ? "daster" : "pajamas"),
+      }))
+    : fallbackFeatured.map(p => ({ slug: p.slug, name: p.name, price: p.price, image: p.image }));
   return (
     <>
       {/* Hero — full bleed, header overlays this */}
@@ -27,7 +51,7 @@ export default function Index() {
             Handcrafted knitwear for every season.
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            {featuredProducts.map(product => (
+            {featured.map(product => (
               <Link
                 key={product.slug}
                 to={`/product/${product.slug}`}
