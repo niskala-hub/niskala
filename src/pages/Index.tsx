@@ -4,6 +4,7 @@ import coreCollection from "@/assets/collections/core-collection.jpg";
 import setsAndPairs from "@/assets/collections/sets-and-pairs.jpg";
 import NewsletterSignup from "@/components/NewsletterSignup";
 import { featuredProducts } from "@/data/products";
+import { formatIDR } from "@/lib/currency";
 
 export default function Index() {
   return (
@@ -41,7 +42,7 @@ export default function Index() {
                   />
                 </div>
                 <h3 className="text-base font-light text-foreground mb-1">{product.name}</h3>
-                <p className="text-sm text-muted-foreground">${product.price.toFixed(2)}</p>
+                <p className="text-sm text-muted-foreground">{formatIDR(product.price)}</p>
               </Link>
             ))}
           </div>

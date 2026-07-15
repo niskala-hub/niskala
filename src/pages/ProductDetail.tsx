@@ -5,6 +5,7 @@ import { useCart } from "@/context/CartContext";
 import { useToast } from "@/hooks/use-toast";
 import QuantitySelector from "@/components/QuantitySelector";
 import ProductCard from "@/components/ProductCard";
+import { formatIDR } from "@/lib/currency";
 
 export default function ProductDetail() {
   const { slug } = useParams<{ slug: string }>();
@@ -46,7 +47,7 @@ export default function ProductDetail() {
           {/* Info */}
           <div className="flex flex-col">
             <h1 className="text-2xl md:text-3xl font-bold uppercase tracking-wide text-foreground mb-4">{product.name}</h1>
-            <p className="text-4xl md:text-5xl font-bold text-foreground mb-6">${product.price.toFixed(2)}</p>
+            <p className="text-4xl md:text-5xl font-bold text-foreground mb-6">{formatIDR(product.price)}</p>
             {product.availability && (
               <p className="text-sm text-accent font-medium mb-4">{product.availability}</p>
             )}
