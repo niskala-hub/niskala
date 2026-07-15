@@ -51,7 +51,7 @@ export default function Index() {
             Handcrafted knitwear for every season.
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            {featuredProducts.map(product => (
+            {featured.map(product => (
               <Link
                 key={product.slug}
                 to={`/product/${product.slug}`}
