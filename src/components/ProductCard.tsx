@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import type { Product } from "@/data/products";
+import { formatIDR } from "@/lib/currency";
 
 export default function ProductCard({ product }: { product: Product }) {
   return (
@@ -26,9 +27,9 @@ export default function ProductCard({ product }: { product: Product }) {
           )}
         </div>
         <div className="flex items-center gap-2 mt-1">
-          <span className="text-sm text-foreground">${product.price.toFixed(2)}</span>
+          <span className="text-sm text-foreground">{formatIDR(product.price)}</span>
           {product.originalPrice && (
-            <span className="text-sm text-muted-foreground/60 line-through">${product.originalPrice.toFixed(2)}</span>
+            <span className="text-sm text-muted-foreground/60 line-through">{formatIDR(product.originalPrice)}</span>
           )}
         </div>
       </div>
