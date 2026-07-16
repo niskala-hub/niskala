@@ -76,7 +76,7 @@ export default function Index() {
       {/* Collections — tight gap, polished overlays */}
       <section className="max-w-7xl mx-auto px-6 py-12">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-          <Link to="/collections/core" className="relative overflow-hidden group block">
+          <Link to="/collections/sleep-dress" className="relative overflow-hidden group block">
             <img
               src={coreCollection}
               alt="The Core Collection"
@@ -87,7 +87,7 @@ export default function Index() {
               <h3 className="text-2xl md:text-3xl font-light text-white">The Sleep Dress</h3>
             </div>
           </Link>
-          <Link to="/collections/sets-and-pairs" className="relative overflow-hidden group block">
+          <Link to="/collections/lounge-sets" className="relative overflow-hidden group block">
             <img
               src={setsAndPairs}
               alt="Sets and Pairs"
