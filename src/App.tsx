@@ -12,8 +12,8 @@ import About from "./pages/About";
 import Contact from "./pages/Contact";
 import Cart from "./pages/Cart";
 import ProductDetail from "./pages/ProductDetail";
-import CoreCollection from "./pages/CoreCollection";
-import SetsAndPairs from "./pages/SetsAndPairs";
+import SleepDress from "./pages/SleepDress";
+import LoungeSets from "./pages/LoungeSets";
 import Auth from "./pages/Auth";
 import AdminLayout from "./components/admin/AdminLayout";
 import Dashboard from "./pages/admin/Dashboard";
@@ -39,8 +39,8 @@ const App = () => (
                 <Route path="/contact" element={<Contact />} />
                 <Route path="/cart" element={<Cart />} />
                 <Route path="/product/:slug" element={<ProductDetail />} />
-                <Route path="/collections/core" element={<CoreCollection />} />
-                <Route path="/collections/sets-and-pairs" element={<SetsAndPairs />} />
+                <Route path="/collections/sleep-dress" element={<SleepDress />} />
+                <Route path="/collections/lounge-sets" element={<LoungeSets />} />
               </Route>
               <Route path="/auth" element={<Auth />} />
               <Route path="/admin" element={<AdminLayout />}>
