@@ -25,11 +25,11 @@ export default function Index() {
 
   const featured = dbProducts && dbProducts.length > 0
     ? dbProducts.map((p, i) => ({
-        slug: p.slug,
-        name: p.name,
-        price: Number(p.price),
-        image: resolveProductImage(p.image_url, i % 2 === 0 ? "daster" : "pajamas"),
-      }))
+      slug: p.slug,
+      name: p.name,
+      price: Number(p.price),
+      image: resolveProductImage(p.image_url, i % 2 === 0 ? "daster" : "pajamas"),
+    }))
     : fallbackFeatured.map(p => ({ slug: p.slug, name: p.name, price: p.price, image: p.image }));
   return (
     <>
@@ -47,8 +47,8 @@ export default function Index() {
       {/* Featured Products — side-by-side layout */}
       <section className="max-w-7xl mx-auto px-6 py-24">
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-12 items-start">
-        <h2 className="text-3xl md:text-4xl font-light text-foreground leading-snug">
-            Handcrafted knitwear for every season.
+          <h2 className="text-3xl md:text-4xl font-light text-foreground leading-snug">
+            Premium homewear for your everyday retreat.
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             {featured.map(product => (
@@ -84,7 +84,7 @@ export default function Index() {
             />
             <div className="absolute inset-0 bg-black/20 group-hover:bg-black/30 transition-colors duration-500 flex flex-col justify-between p-8">
               <span className="text-sm uppercase tracking-widest text-white/80">Explore</span>
-              <h3 className="text-2xl md:text-3xl font-light text-white">The Core Collection</h3>
+              <h3 className="text-2xl md:text-3xl font-light text-white">The Sleep Dress</h3>
             </div>
           </Link>
           <Link to="/collections/sets-and-pairs" className="relative overflow-hidden group block">
@@ -95,7 +95,7 @@ export default function Index() {
             />
             <div className="absolute inset-0 bg-black/20 group-hover:bg-black/30 transition-colors duration-500 flex flex-col justify-between p-8">
               <span className="text-sm uppercase tracking-widest text-white/80">Start Fresh</span>
-              <h3 className="text-2xl md:text-3xl font-light text-white">Sets and Pairs</h3>
+              <h3 className="text-2xl md:text-3xl font-light text-white">The Lounge Sets</h3>
             </div>
           </Link>
         </div>

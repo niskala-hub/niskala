@@ -15,7 +15,7 @@ export default function SetsAndPairs() {
         <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
           <div className="text-center text-white">
             <p className="text-sm uppercase tracking-widest mb-3">Start Fresh</p>
-            <h1 className="text-4xl md:text-5xl font-light">Sets and Pairs</h1>
+            <h1 className="text-4xl md:text-5xl font-light">The Lounge Sets</h1>
           </div>
         </div>
       </section>
@@ -23,14 +23,12 @@ export default function SetsAndPairs() {
       {/* Story */}
       <section className="max-w-3xl mx-auto px-6 py-16 text-center">
         <h2 className="text-2xl md:text-3xl font-light text-gray-900 mb-6">
-          Better together.
+          Elevated lounging, uncompromising comfort.
         </h2>
         <p className="text-base leading-relaxed text-gray-700 mb-6">
-          Our curated sets and pairs are designed to work in harmony — matched yarns, complementary textures, and coordinated tones that bring cohesion to your wardrobe. Whether you're layering for yourself or gifting to someone special, these groupings take the guesswork out of styling.
-        </p>
+          Premium Pajamas mewakili visi Niskala tentang keseimbangan—sebuah harmoni antara kenyamanan mutlak dan siluet yang terstruktur. Setelan dua potong ini dikonstruksi dari material Rayon Crinkle pilihan yang memberikan sirkulasi udara maksimal, menjaga kulit tetap sejuk di iklim tropis. Hadir dalam rona warna netral yang elegan, koleksi ini mentransformasi waktu luang Anda menjadi sebuah kemewahan sehari-hari.        </p>
         <p className="text-base leading-relaxed text-gray-700">
-          Each set is thoughtfully composed to balance warmth and form. Mix within a set or combine across collections — the earthy palette ensures everything works beautifully together.
-        </p>
+          Dirancang dengan potongan kemeja yang longgar dan celana berpotongan lebar (wide-leg), set piyama kami memberikan kebebasan gerak tanpa batas. Perpaduan desain kerah yang rapi dan material yang jatuh (flowy) menjadikannya sangat front-door ready—terlalu nyaman untuk dilepas saat tidur, namun cukup pantas dan sopan saat Anda harus menerima tamu atau sekadar bersantai di ruang keluarga.        </p>
       </section>
 
       {/* Products */}
@@ -44,12 +42,22 @@ export default function SetsAndPairs() {
 
       {/* Gift note */}
       <section className="bg-gray-50 py-16 px-6">
-        <div className="max-w-xl mx-auto text-center">
-          <h2 className="text-2xl font-light text-gray-900 mb-4">The Perfect Gift</h2>
-          <p className="text-base text-gray-700 leading-relaxed mb-6">
-            Every set ships in our custom gift packaging — tissue-wrapped and nestled in a recycled kraft box. Add a handwritten note at checkout to make it personal.
-          </p>
-          <p className="text-sm text-gray-500 uppercase tracking-wider">Free shipping on all sets</p>
+        <div className="max-w-3xl mx-auto text-center">
+          <h2 className="text-2xl font-light text-gray-900 mb-8">The Process</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div>
+              <p className="text-lg font-light text-gray-900 mb-2">01 — Sourcing</p>
+              <p className="text-sm text-gray-600">Pemilihan material Rayon terbaik dari pusat tekstil Tasikmalaya, dengan fokus khusus pada kelembutan serat, kemampuan menyerap keringat, dan tekstur crinkle alami yang praktis karena tidak perlu disetrika.</p>
+            </div>
+            <div>
+              <p className="text-lg font-light text-gray-900 mb-2">02 — Construct</p>
+              <p className="text-sm text-gray-600">Setiap setelan dijahit dengan ketelitian tinggi, memperhatikan struktur kerah agar tetap rapi, serta menggunakan karet pinggang (waistband) yang sangat fleksibel dan tidak menekan perut, memberikan kenyamanan berjam-jam.</p>
+            </div>
+            <div>
+              <p className="text-lg font-light text-gray-900 mb-2">03 — Finish</p>
+              <p className="text-sm text-gray-600">Pengecekan kualitas menyeluruh pada setiap detail fungsional, mulai dari kekuatan kancing, kerapian lubang kancing, hingga kekuatan jahitan pada celana untuk memastikan daya tahan saat Anda bergerak bebas.</p>
+            </div>
+          </div>
         </div>
       </section>
     </>

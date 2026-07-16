@@ -40,10 +40,10 @@ export default function Contact() {
             </p>
             <div className="space-y-1">
               <p className="text-lg text-foreground font-medium">
-                <a href="mailto:email@example.com" className="hover:underline">email@example.com</a>
+                <a href="mailto:niskala.hello@gmail.com" className="hover:underline">niskala.hello@gmail.com</a>
               </p>
               <p className="text-lg text-foreground font-medium">
-                <a href="tel:+15555555555" className="hover:underline">(555) 555-5555</a>
+                <a href="tel:+6285196749852" className="hover:underline">+62 851 9674 9852</a>
               </p>
             </div>
           </div>
