@@ -11,11 +11,9 @@ export default function About() {
       {/* First text block */}
       <div className="space-y-6 text-sm leading-relaxed text-muted-foreground mb-24">
         <p>
-          Terra Studios began with a simple conviction: that the clothes we wear should carry the warmth of the hands that made them. Every piece in our collection is hand-knitted from natural fibers — merino, alpaca, cashmere, and heritage breed wools — sourced from small farms and independent spinners who share our commitment to ethical, sustainable practice.
-        </p>
+          Niskala bermula dari sebuah keyakinan sederhana: bahwa pakaian yang kita kenakan di ruang paling privat tidak seharusnya mengorbankan keanggunan demi sebuah kenyamanan. Setiap koleksi kami dirancang untuk memeluk rasa lelah Anda, menggunakan material pilihan seperti Rayon Crinkle dan Rayon Twill yang sejuk, sangat jatuh (flowy), dan menyerap keringat. Lahir dari denyut nadi industri konveksi di Tasikmalaya, kami memadukan tradisi jahitan tangan yang presisi dengan standar kualitas homewear butik premium        </p>
         <p>
-          Our process is slow by design. Each garment begins as a skein of yarn, carefully wound and paired with a pattern developed in-house. From there, skilled artisans work stitch by stitch, shaping fabric that moves and breathes with the body. The result is knitwear with a depth of texture and character that no machine can replicate — pieces that age gracefully, soften over time, and become more personal with every wear.
-        </p>
+          Proses desain kami menitikberatkan pada kebebasan gerak dan fungsionalitas. Menolak kerumitan, setiap potongan siluet A-Line dan setelan piyama Niskala diciptakan agar longgar, ramah untuk ibu menyusui, dan memiliki keunggulan Ironless (tidak perlu disetrika). Ini adalah pakaian yang bergerak selaras dengan tubuh Anda—sangat nyaman untuk rebahan, namun tetap memancarkan keanggunan (front-door ready) saat Anda harus menyambut tamu atau mengambil paket di depan pintu rumah.        </p>
       </div>
 
       {/* Full-width image */}
@@ -30,16 +28,14 @@ export default function About() {
       {/* Second text block */}
       <div className="space-y-6 text-sm leading-relaxed text-muted-foreground mb-16">
         <p>
-          We work exclusively with natural, undyed and plant-dyed yarns, embracing the subtle tonal variations that come from the fleece itself. Our earth-toned palette — sand, oatmeal, rust, charcoal, moss — reflects the landscapes that inspire us: windswept coastlines, autumn moorlands, and the quiet beauty of the countryside in every season.
-        </p>
+          Kami merangkul palet warna yang membumi dan menenangkan jiwa—seperti Charcoal, Sage Green, hingga Oat/Krem yang lembut. Warna-warna ini dipilih bukan sekadar demi estetika, melainkan untuk menciptakan resonansi ketenangan di ruang pribadi Anda, memantulkan ritme lambat dari momen istirahat yang paling berharga.        </p>
         <p>
-          Each collection is released in small batches, and many pieces are made to order. We believe in making less and making it well. When you wear Terra Studios, you carry with you the rhythm of the needles, the texture of the yarn, and the intention of a maker who cared about every single stitch.
-        </p>
+          Koleksi Niskala dirilis dalam skala batch yang kecil dan penuh perhitungan. Kami percaya pada prinsip memproduksi secara lebih esensial, namun mengeksekusinya dengan sangat baik. Saat Anda mengenakan Niskala, Anda tidak hanya memakai sepotong daster atau piyama; Anda sedang mengenakan sebuah ketenangan, keleluasaan, dan intensi dari kami yang peduli pada setiap detail jahitan        </p>
       </div>
 
       {/* Attribution */}
       <p className="text-sm text-muted-foreground">
-        Knitwear by Terra Studios
+        Homewear premium oleh Niskala.
       </p>
     </article>
   );
