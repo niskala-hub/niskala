@@ -3,13 +3,17 @@ import { ShoppingCart, Menu, X, Instagram } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import logoTypografi from "@/assets/logo/Logo NISKALA Typografi.svg";
+import { TikTokIcon } from "@/components/icons/TikTok";
 
 const navLinks = [
   { to: "/shop", label: "Shop" },
   { to: "/about", label: "About" },
   { to: "/contact", label: "Contact" },
-  
 ];
+
+const INSTAGRAM_URL = "https://www.instagram.com/niskala.wear/";
+const TIKTOK_URL = "https://www.tiktok.com/@niskala.wear.official";
 
 export default function Header() {
   const { totalItems } = useCart();
@@ -38,14 +42,15 @@ export default function Header() {
       )}
     >
       <div className="flex items-center justify-between px-6 py-4 max-w-7xl mx-auto">
-        <Link
-          to="/"
-          className={cn(
-            "text-2xl font-light tracking-wide transition-colors",
-            transparent ? "text-white" : "text-foreground"
-          )}
-        >
-          NISKALA
+        <Link to="/" aria-label="NISKALA home" className="flex items-center">
+          <img
+            src={logoTypografi}
+            alt="NISKALA"
+            className={cn(
+              "h-6 md:h-7 w-auto transition",
+              transparent ? "brightness-0 invert" : ""
+            )}
+          />
         </Link>
 
         {/* Desktop nav */}
@@ -68,8 +73,11 @@ export default function Header() {
         </nav>
 
         <div className="hidden md:flex items-center gap-5">
-          <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
+          <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" aria-label="Instagram">
             <Instagram className={cn("w-[18px] h-[18px] transition-colors", transparent ? "text-white/80 hover:text-white" : "text-muted-foreground hover:text-foreground")} />
+          </a>
+          <a href={TIKTOK_URL} target="_blank" rel="noopener noreferrer" aria-label="TikTok">
+            <TikTokIcon className={cn("w-[18px] h-[18px] transition-colors", transparent ? "text-white/80 hover:text-white" : "text-muted-foreground hover:text-foreground")} />
           </a>
           <Link to="/cart" className="relative" aria-label="Shopping cart">
             <ShoppingCart className={cn("w-[18px] h-[18px] transition-colors", transparent ? "text-white/80 hover:text-white" : "text-muted-foreground hover:text-foreground")} />
@@ -116,6 +124,14 @@ export default function Header() {
               {link.label}
             </Link>
           ))}
+          <div className="flex items-center gap-5 pt-2">
+            <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" aria-label="Instagram">
+              <Instagram className="w-5 h-5 text-muted-foreground" />
+            </a>
+            <a href={TIKTOK_URL} target="_blank" rel="noopener noreferrer" aria-label="TikTok">
+              <TikTokIcon className="w-5 h-5 text-muted-foreground" />
+            </a>
+          </div>
         </nav>
       )}
     </header>
