@@ -95,15 +95,16 @@ export default function ProductDetail() {
             )}
 
             {!isSoldOut ? (
-              <div className="flex items-stretch gap-3">
-                <QuantitySelector quantity={quantity} onChange={setQuantity} />
-                <button
-                  onClick={handleAddToCart}
-                  className="flex-1 py-3 bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
-                >
-                  Add To Cart
-                </button>
-              </div>
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent(
+                  `Halo NISKALA, saya ingin memesan:\n\n${product.name}\n${typeof window !== "undefined" ? window.location.origin : ""}/product/${product.slug}`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-3 bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity text-center"
+              >
+                Order Via WhatsApp
+              </a>
             ) : (
               <button disabled className="w-full py-3 bg-muted text-muted-foreground text-sm font-medium cursor-not-allowed">
                 Sold Out
