@@ -19,6 +19,8 @@ import AdminLayout from "./components/admin/AdminLayout";
 import Dashboard from "./pages/admin/Dashboard";
 import AdminCategories from "./pages/admin/Categories";
 import AdminProducts from "./pages/admin/Products";
+import AdminBioLinks from "./pages/admin/BioLinks";
+import LinkBio from "./pages/LinkBio";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -43,10 +45,12 @@ const App = () => (
                 <Route path="/collections/lounge-sets" element={<LoungeSets />} />
               </Route>
               <Route path="/auth" element={<Auth />} />
+              <Route path="/links" element={<LinkBio />} />
               <Route path="/admin" element={<AdminLayout />}>
                 <Route index element={<Dashboard />} />
                 <Route path="categories" element={<AdminCategories />} />
                 <Route path="products" element={<AdminProducts />} />
+                <Route path="bio-links" element={<AdminBioLinks />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
