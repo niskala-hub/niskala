@@ -1,8 +1,23 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Pencil, Trash2, Plus, X, MousePointerClick } from "lucide-react";
+import { Pencil, Trash2, Plus, X, MousePointerClick, GripVertical } from "lucide-react";
 import { ICON_NAMES } from "@/pages/LinkBio";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 interface BioLink {
   id: string;
@@ -18,11 +33,65 @@ type Draft = {
   title: string;
   url: string;
   icon: string;
-  order: number;
   is_active: boolean;
 };
 
-const empty: Draft = { title: "", url: "", icon: "Link2", order: 0, is_active: true };
+const empty: Draft = { title: "", url: "", icon: "Link2", is_active: true };
+
+function SortableRow({
+  l,
+  onEdit,
+  onRemove,
+  onToggle,
+}: {
+  l: BioLink;
+  onEdit: (l: BioLink) => void;
+  onRemove: (id: string) => void;
+  onToggle: (l: BioLink) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: l.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+  return (
+    <tr ref={setNodeRef} style={style} className="border-t border-border bg-background">
+      <td className="px-4 py-3 w-16">
+        <button
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing p-1 hover:bg-muted"
+          aria-label="Drag to reorder"
+        >
+          <GripVertical className="w-4 h-4 text-muted-foreground" />
+        </button>
+      </td>
+      <td className="px-4 py-3 w-16 text-muted-foreground">{l.order}</td>
+      <td className="px-4 py-3">{l.title}</td>
+      <td className="px-4 py-3 text-muted-foreground truncate max-w-xs">{l.url}</td>
+      <td className="px-4 py-3 text-muted-foreground">{l.icon}</td>
+      <td className="px-4 py-3">
+        <span className="inline-flex items-center gap-1 text-muted-foreground">
+          <MousePointerClick className="w-3 h-3" /> {l.clicks}
+        </span>
+      </td>
+      <td className="px-4 py-3">
+        <button
+          onClick={() => onToggle(l)}
+          className={`text-xs px-2 py-1 border ${l.is_active ? "border-accent text-accent" : "border-border text-muted-foreground"}`}
+        >
+          {l.is_active ? "Active" : "Hidden"}
+        </button>
+      </td>
+      <td className="px-4 py-3 flex gap-2">
+        <button onClick={() => onEdit(l)} className="p-2 hover:bg-muted"><Pencil className="w-4 h-4" /></button>
+        <button onClick={() => onRemove(l.id)} className="p-2 hover:bg-muted text-destructive"><Trash2 className="w-4 h-4" /></button>
+      </td>
+    </tr>
+  );
+}
 
 export default function AdminBioLinks() {
   const [rows, setRows] = useState<BioLink[]>([]);
@@ -30,6 +99,8 @@ export default function AdminBioLinks() {
   const [editing, setEditing] = useState<BioLink | null>(null);
   const [draft, setDraft] = useState<Draft>(empty);
   const { toast } = useToast();
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   const load = async () => {
     const { data, error } = await supabase
@@ -44,21 +115,25 @@ export default function AdminBioLinks() {
 
   const openNew = () => {
     setEditing(null);
-    setDraft({ ...empty, order: rows.length + 1 });
+    setDraft({ ...empty });
     setOpen(true);
   };
   const openEdit = (l: BioLink) => {
     setEditing(l);
-    setDraft({ title: l.title, url: l.url, icon: l.icon, order: l.order, is_active: l.is_active });
+    setDraft({ title: l.title, url: l.url, icon: l.icon, is_active: l.is_active });
     setOpen(true);
   };
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { error } = editing
-      ? await supabase.from("bio_links").update(draft).eq("id", editing.id)
-      : await supabase.from("bio_links").insert(draft);
-    if (error) return toast({ title: "Error", description: error.message, variant: "destructive" });
+    if (editing) {
+      const { error } = await supabase.from("bio_links").update(draft).eq("id", editing.id);
+      if (error) return toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      const nextOrder = rows.length + 1;
+      const { error } = await supabase.from("bio_links").insert({ ...draft, order: nextOrder });
+      if (error) return toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
     toast({ title: editing ? "Link updated" : "Link created" });
     setOpen(false);
     load();
@@ -81,12 +156,35 @@ export default function AdminBioLinks() {
     load();
   };
 
+  const onDragEnd = async (e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const oldIdx = rows.findIndex(r => r.id === active.id);
+    const newIdx = rows.findIndex(r => r.id === over.id);
+    if (oldIdx < 0 || newIdx < 0) return;
+    const reordered = arrayMove(rows, oldIdx, newIdx).map((r, i) => ({ ...r, order: i + 1 }));
+    setRows(reordered);
+    const updates = reordered.map(r =>
+      supabase.from("bio_links").update({ order: r.order }).eq("id", r.id)
+    );
+    const results = await Promise.all(updates);
+    const err = results.find(r => r.error)?.error;
+    if (err) {
+      toast({ title: "Error saving order", description: err.message, variant: "destructive" });
+      load();
+    } else {
+      toast({ title: "Order updated" });
+    }
+  };
+
   return (
     <div className="p-10">
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-light">Bio Links</h1>
-          <p className="text-sm text-muted-foreground mt-1">{rows.length} total · public page at /links</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            {rows.length} total · drag rows to reorder · public page at /links
+          </p>
         </div>
         <button onClick={openNew} className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground text-sm">
           <Plus className="w-4 h-4" /> New link
@@ -97,6 +195,7 @@ export default function AdminBioLinks() {
         <table className="w-full text-sm">
           <thead className="bg-muted text-left">
             <tr>
+              <th className="px-4 py-3 font-medium w-16"></th>
               <th className="px-4 py-3 font-medium w-16">Order</th>
               <th className="px-4 py-3 font-medium">Title</th>
               <th className="px-4 py-3 font-medium">URL</th>
@@ -106,36 +205,18 @@ export default function AdminBioLinks() {
               <th className="px-4 py-3 font-medium w-28">Actions</th>
             </tr>
           </thead>
-          <tbody>
-            {rows.map(l => (
-              <tr key={l.id} className="border-t border-border">
-                <td className="px-4 py-3">{l.order}</td>
-                <td className="px-4 py-3">{l.title}</td>
-                <td className="px-4 py-3 text-muted-foreground truncate max-w-xs">{l.url}</td>
-                <td className="px-4 py-3 text-muted-foreground">{l.icon}</td>
-                <td className="px-4 py-3">
-                  <span className="inline-flex items-center gap-1 text-muted-foreground">
-                    <MousePointerClick className="w-3 h-3" /> {l.clicks}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <button
-                    onClick={() => toggleActive(l)}
-                    className={`text-xs px-2 py-1 border ${l.is_active ? "border-accent text-accent" : "border-border text-muted-foreground"}`}
-                  >
-                    {l.is_active ? "Active" : "Hidden"}
-                  </button>
-                </td>
-                <td className="px-4 py-3 flex gap-2">
-                  <button onClick={() => openEdit(l)} className="p-2 hover:bg-muted"><Pencil className="w-4 h-4" /></button>
-                  <button onClick={() => remove(l.id)} className="p-2 hover:bg-muted text-destructive"><Trash2 className="w-4 h-4" /></button>
-                </td>
-              </tr>
-            ))}
-            {rows.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">No links yet.</td></tr>
-            )}
-          </tbody>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+            <SortableContext items={rows.map(r => r.id)} strategy={verticalListSortingStrategy}>
+              <tbody>
+                {rows.map(l => (
+                  <SortableRow key={l.id} l={l} onEdit={openEdit} onRemove={remove} onToggle={toggleActive} />
+                ))}
+                {rows.length === 0 && (
+                  <tr><td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">No links yet.</td></tr>
+                )}
+              </tbody>
+            </SortableContext>
+          </DndContext>
         </table>
       </div>
 
@@ -156,19 +237,12 @@ export default function AdminBioLinks() {
                   placeholder="https://…"
                   className="w-full mt-1 px-3 py-2 border border-border font-mono text-sm" />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs uppercase tracking-wider text-muted-foreground">Order</label>
-                  <input required type="number" value={draft.order} onChange={e => setDraft(d => ({ ...d, order: Number(e.target.value) }))}
-                    className="w-full mt-1 px-3 py-2 border border-border" />
-                </div>
-                <div>
-                  <label className="text-xs uppercase tracking-wider text-muted-foreground">Icon</label>
-                  <select value={draft.icon} onChange={e => setDraft(d => ({ ...d, icon: e.target.value }))}
-                    className="w-full mt-1 px-3 py-2 border border-border bg-background">
-                    {ICON_NAMES.map(n => <option key={n} value={n}>{n}</option>)}
-                  </select>
-                </div>
+              <div>
+                <label className="text-xs uppercase tracking-wider text-muted-foreground">Icon</label>
+                <select value={draft.icon} onChange={e => setDraft(d => ({ ...d, icon: e.target.value }))}
+                  className="w-full mt-1 px-3 py-2 border border-border bg-background">
+                  {ICON_NAMES.map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
               </div>
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={draft.is_active} onChange={e => setDraft(d => ({ ...d, is_active: e.target.checked }))} />
