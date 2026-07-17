@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      bio_links: {
+        Row: {
+          clicks: number
+          created_at: string
+          icon: string
+          id: string
+          is_active: boolean
+          order: number
+          title: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          clicks?: number
+          created_at?: string
+          icon?: string
+          id?: string
+          is_active?: boolean
+          order?: number
+          title: string
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          clicks?: number
+          created_at?: string
+          icon?: string
+          id?: string
+          is_active?: boolean
+          order?: number
+          title?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: []
+      }
       categories: {
         Row: {
           created_at: string
@@ -117,6 +153,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      increment_bio_link_click: {
+        Args: { _link_id: string }
+        Returns: undefined
       }
     }
     Enums: {
