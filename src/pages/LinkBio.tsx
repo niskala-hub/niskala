@@ -2,11 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Instagram, Mail, ShoppingBag, Globe, Youtube, MessageCircle,
   MapPin, Link2, Facebook, Music2, Phone, Star,
+  type LucideIcon,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import logo from "@/assets/logo/Logo NISKALA Circle.svg";
 
-const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
+const ICON_MAP: Record<string, LucideIcon> = {
   Instagram, Mail, ShoppingBag, Globe, Youtube, MessageCircle,
   MapPin, Facebook, Music2, Phone, Star, Link2,
 };
