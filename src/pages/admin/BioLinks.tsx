@@ -27,6 +27,15 @@ interface BioLink {
   order: number;
   is_active: boolean;
   clicks: number;
+  last_click_at: string | null;
+}
+
+function formatLastClick(value: string | null) {
+  if (!value) return "Never";
+  return new Date(value).toLocaleString("id-ID", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
 }
 
 type Draft = {
