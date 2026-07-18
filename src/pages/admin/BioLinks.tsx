@@ -86,6 +86,9 @@ function SortableRow({
           <MousePointerClick className="w-3 h-3" /> {l.clicks}
         </span>
       </td>
+      <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+        {formatLastClick(l.last_click_at)}
+      </td>
       <td className="px-4 py-3">
         <button
           onClick={() => onToggle(l)}
