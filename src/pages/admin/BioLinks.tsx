@@ -210,6 +210,7 @@ export default function AdminBioLinks() {
               <th className="px-4 py-3 font-medium">URL</th>
               <th className="px-4 py-3 font-medium">Icon</th>
               <th className="px-4 py-3 font-medium">Clicks</th>
+              <th className="px-4 py-3 font-medium">Last Clicked</th>
               <th className="px-4 py-3 font-medium">Active</th>
               <th className="px-4 py-3 font-medium w-28">Actions</th>
             </tr>
@@ -221,7 +222,7 @@ export default function AdminBioLinks() {
                   <SortableRow key={l.id} l={l} onEdit={openEdit} onRemove={remove} onToggle={toggleActive} />
                 ))}
                 {rows.length === 0 && (
-                  <tr><td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">No links yet.</td></tr>
+                  <tr><td colSpan={9} className="px-4 py-12 text-center text-muted-foreground">No links yet.</td></tr>
                 )}
               </tbody>
             </SortableContext>
