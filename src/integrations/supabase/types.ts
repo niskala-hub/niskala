@@ -21,6 +21,7 @@ export type Database = {
           icon: string
           id: string
           is_active: boolean
+          last_click_at: string | null
           order: number
           title: string
           updated_at: string
@@ -32,6 +33,7 @@ export type Database = {
           icon?: string
           id?: string
           is_active?: boolean
+          last_click_at?: string | null
           order?: number
           title: string
           updated_at?: string
@@ -43,6 +45,7 @@ export type Database = {
           icon?: string
           id?: string
           is_active?: boolean
+          last_click_at?: string | null
           order?: number
           title?: string
           updated_at?: string
