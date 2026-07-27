@@ -45,19 +45,19 @@ export default function Index() {
       </section>
 
       {/* Featured Products — side-by-side layout */}
-      <section className="max-w-7xl mx-auto px-6 py-24">
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-12 items-start">
-          <h2 className="text-3xl md:text-4xl font-light text-foreground leading-snug">
+      <section className="max-w-7xl mx-auto px-4 md:px-6 py-16 md:py-24">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-8 lg:gap-12 items-start">
+          <h2 className="text-2xl md:text-3xl lg:text-4xl font-light text-foreground leading-snug">
             Premium homewear for your everyday retreat.
           </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 md:gap-6">
             {featured.map(product => (
               <Link
                 key={product.slug}
                 to={`/product/${product.slug}`}
                 className="group block"
               >
-                <div className="bg-[hsl(var(--warm-bg))] aspect-square overflow-hidden mb-4">
+                <div className="bg-[hsl(var(--warm-bg))] aspect-square overflow-hidden mb-3 md:mb-4">
                   <img
                     src={product.image}
                     alt={product.name}
@@ -65,7 +65,7 @@ export default function Index() {
                     loading="lazy"
                   />
                 </div>
-                <h3 className="text-base font-light text-foreground mb-1">{product.name}</h3>
+                <h3 className="text-sm md:text-base font-light text-foreground mb-1 truncate">{product.name}</h3>
                 <p className="text-sm text-muted-foreground">{formatIDR(product.price)}</p>
               </Link>
             ))}
