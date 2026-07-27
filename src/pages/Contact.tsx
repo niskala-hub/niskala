@@ -28,21 +28,21 @@ export default function Contact() {
 
   return (
     <>
-      <section className="max-w-6xl mx-auto px-6 py-24">
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_1.2fr] gap-16 items-start">
+      <section className="max-w-6xl mx-auto px-4 md:px-6 py-16 md:py-24">
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_1.2fr] gap-10 md:gap-16 items-start">
           {/* Left — Info */}
           <div>
-            <h1 className="text-4xl md:text-5xl font-light text-foreground mb-8 leading-tight">
+            <h1 className="text-3xl md:text-5xl font-light text-foreground mb-6 md:mb-8 leading-tight">
               Get in touch.
             </h1>
-            <p className="text-sm leading-relaxed text-muted-foreground mb-10">
+            <p className="text-sm leading-relaxed text-muted-foreground mb-8 md:mb-10">
               We'd love to hear from you — whether you have a question about our knitwear, need help with an order, or want to discuss a custom commission. Our small team typically responds within one business day.
             </p>
             <div className="space-y-1">
-              <p className="text-lg text-foreground font-medium">
+              <p className="text-base md:text-lg text-foreground font-medium">
                 <a href="mailto:niskala.hello@gmail.com" className="hover:underline">niskala.hello@gmail.com</a>
               </p>
-              <p className="text-lg text-foreground font-medium">
+              <p className="text-base md:text-lg text-foreground font-medium">
                 <a href="tel:+6285196749852" className="hover:underline">+62 851 9674 9852</a>
               </p>
             </div>
@@ -86,7 +86,7 @@ export default function Contact() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-8 py-3 bg-accent text-accent-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 md:px-8 py-3 bg-accent text-accent-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? "Sending..." : "Submit"}
             </button>
