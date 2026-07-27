@@ -22,13 +22,13 @@ export default function NewsletterSignup() {
 
   return (
     <section
-      className="relative py-28 px-6"
+      className="relative py-20 md:py-28 px-4 md:px-6"
       style={{ backgroundImage: `url(${newsletterBg})`, backgroundSize: "cover", backgroundPosition: "center" }}
     >
       <div className="absolute inset-0 bg-foreground/40" />
-      <div className="relative z-10 max-w-md mx-auto text-center text-white">
-        <h2 className="text-3xl md:text-4xl font-light mb-3 tracking-wide">Monthly Dispatch</h2>
-        <p className="text-sm mb-8 text-white/80">Sign up to receive news and updates.</p>
+      <div className="relative z-10 max-w-md mx-auto text-center text-white px-2">
+        <h2 className="text-2xl md:text-3xl lg:text-4xl font-light mb-3 tracking-wide">Monthly Dispatch</h2>
+        <p className="text-sm mb-6 md:mb-8 text-white/80">Sign up to receive news and updates.</p>
         <form onSubmit={handleSubmit} className="flex gap-0">
           <input
             type="email"
@@ -41,7 +41,7 @@ export default function NewsletterSignup() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="px-6 py-3 bg-accent text-accent-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+            className="px-4 md:px-6 py-3 bg-accent text-accent-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
           >
             {isSubmitting ? "..." : "Sign Up"}
           </button>
