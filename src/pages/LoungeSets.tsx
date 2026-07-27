@@ -67,13 +67,13 @@ export default function LoungeSets() {
       </section>
 
       {/* Products */}
-      <section className="max-w-7xl mx-auto px-6 py-12">
+      <section className="max-w-7xl mx-auto px-4 md:px-6 py-10 md:py-12">
         {loading ? (
           <p className="text-center text-muted-foreground">Loading…</p>
         ) : products.length === 0 ? (
           <p className="text-center text-muted-foreground">No products in this collection yet.</p>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6 lg:gap-8">
             {products.map((p) => {
               const soldOut = p.stock <= 0;
               return (
@@ -86,9 +86,9 @@ export default function LoungeSets() {
                       loading="lazy"
                     />
                   </div>
-                  <div className="mt-4 flex items-baseline justify-between gap-2">
-                    <h3 className="text-base font-medium text-foreground">{p.name}</h3>
-                    {soldOut && <span className="text-xs text-accent font-medium">Sold out</span>}
+                  <div className="mt-3 md:mt-4 flex items-baseline justify-between gap-1 md:gap-2">
+                    <h3 className="text-sm md:text-base font-medium text-foreground truncate">{p.name}</h3>
+                    {soldOut && <span className="text-[10px] md:text-xs text-accent font-medium shrink-0">Sold out</span>}
                   </div>
                   <p className="text-sm text-foreground mt-1">{formatIDR(Number(p.price))}</p>
                 </Link>
