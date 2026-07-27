@@ -54,7 +54,7 @@ export default function Shop() {
                   </div>
                   <div className="mt-3 md:mt-4">
                     <div className="flex items-baseline justify-between gap-1 md:gap-2">
-                      <h3 className="text-sm md:text-base font-medium text-foreground line-clamp-1">{p.name}</h3>
+                      <h3 className="text-sm md:text-base font-medium text-foreground truncate">{p.name}</h3>
                       {soldOut && <span className="text-[10px] md:text-xs text-accent font-medium shrink-0">Sold out</span>}
                     </div>
                     <p className="text-sm text-foreground mt-1">{formatIDR(Number(p.price))}</p>
