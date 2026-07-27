@@ -8,11 +8,11 @@ const TIKTOK_URL = "https://www.tiktok.com/@niskala.wear.official";
 
 export default function Footer() {
   return (
-    <footer className="bg-background py-16 px-6">
+    <footer className="bg-background py-12 md:py-16 px-4 md:px-6">
       <div className="max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr] gap-12">
+        <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr] gap-8 md:gap-12">
           <div>
-            <img src={logoTypografi} alt="NISKALA" className="h-6 w-auto mb-4" />
+            <img src={logoTypografi} alt="NISKALA" className="h-5 md:h-6 w-auto mb-4" />
             <p className="text-sm text-muted-foreground">Premium homewear & casual wear for modern women.</p>
             <div className="flex gap-4 mt-6">
               <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" aria-label="Instagram">
