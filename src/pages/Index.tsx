@@ -37,8 +37,8 @@ export default function Index() {
       <section className="w-full h-[70vh] relative -mt-[72px]">
         <img src={heroBg} alt="Handcrafted artisan knitwear" className="w-full h-full object-cover" />
         <div className="absolute inset-0 bg-[hsl(30_30%_22%/0.3)]" />
-        <div className="absolute bottom-0 left-0 right-0 px-6 pb-16 md:pb-20">
-          <h1 className="text-5xl md:text-7xl lg:text-8xl font-light text-white tracking-wide max-w-7xl mx-auto leading-none">
+        <div className="absolute bottom-0 left-0 right-0 px-4 md:px-6 pb-12 md:pb-20">
+          <h1 className="text-4xl md:text-7xl lg:text-8xl font-light text-white tracking-wide max-w-7xl mx-auto leading-none">
             New Collection
           </h1>
         </div>
