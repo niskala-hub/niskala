@@ -1,6 +1,6 @@
 import { NavLink, Navigate, Outlet, Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { LayoutDashboard, Package, Tags, LogOut, Store, Link2 } from "lucide-react";
+import { LayoutDashboard, Package, Tags, LogOut, Store, Link2, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function AdminLayout() {
