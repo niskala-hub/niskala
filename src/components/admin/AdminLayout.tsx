@@ -42,6 +42,9 @@ export default function AdminLayout() {
           <NavLink to="/admin/bio-links" className={({ isActive }) => cn(link, isActive ? linkActive : linkIdle)}>
             <Link2 className="w-4 h-4" /> Bio Links
           </NavLink>
+          <NavLink to="/admin/accounting" className={({ isActive }) => cn(link, isActive ? linkActive : linkIdle)}>
+            <Wallet className="w-4 h-4" /> Accounting
+          </NavLink>
         </nav>
         <div className="p-4 border-t border-border space-y-2">
           <Link to="/" className={cn(link, linkIdle, "px-2")}>
