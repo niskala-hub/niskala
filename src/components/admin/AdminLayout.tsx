@@ -1,6 +1,6 @@
 import { NavLink, Navigate, Outlet, Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { LayoutDashboard, Package, Tags, LogOut, Store, Link2 } from "lucide-react";
+import { LayoutDashboard, Package, Tags, LogOut, Store, Link2, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function AdminLayout() {
@@ -41,6 +41,9 @@ export default function AdminLayout() {
           </NavLink>
           <NavLink to="/admin/bio-links" className={({ isActive }) => cn(link, isActive ? linkActive : linkIdle)}>
             <Link2 className="w-4 h-4" /> Bio Links
+          </NavLink>
+          <NavLink to="/admin/accounting" className={({ isActive }) => cn(link, isActive ? linkActive : linkIdle)}>
+            <Wallet className="w-4 h-4" /> Accounting
           </NavLink>
         </nav>
         <div className="p-4 border-t border-border space-y-2">

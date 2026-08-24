@@ -8,7 +8,7 @@ import { resolveProductImage } from "@/lib/productImage";
 interface Category { id: string; name: string; }
 interface Product {
   id: string; name: string; slug: string; description: string | null;
-  price: number; stock: number; image_url: string | null; category_id: string | null;
+  price: number; hpp_price: number; stock: number; image_url: string | null; category_id: string | null;
 }
 
 const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -18,7 +18,7 @@ export default function Products() {
   const [cats, setCats] = useState<Category[]>([]);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
-  const [form, setForm] = useState({ name: "", slug: "", description: "", price: 0, stock: 0, category_id: "", image_url: "" });
+  const [form, setForm] = useState({ name: "", slug: "", description: "", price: 0, hpp_price: 0, stock: 0, category_id: "", image_url: "" });
   const [uploading, setUploading] = useState(false);
   const { toast } = useToast();
 
@@ -36,7 +36,7 @@ export default function Products() {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ name: "", slug: "", description: "", price: 0, stock: 0, category_id: "", image_url: "" });
+    setForm({ name: "", slug: "", description: "", price: 0, hpp_price: 0, stock: 0, category_id: "", image_url: "" });
     setOpen(true);
   };
 
@@ -44,7 +44,7 @@ export default function Products() {
     setEditing(p);
     setForm({
       name: p.name, slug: p.slug, description: p.description || "",
-      price: Number(p.price), stock: p.stock,
+      price: Number(p.price), hpp_price: Number(p.hpp_price), stock: p.stock,
       category_id: p.category_id || "", image_url: p.image_url || "",
     });
     setOpen(true);
@@ -77,6 +77,7 @@ export default function Products() {
       slug: form.slug || slugify(form.name),
       description: form.description || null,
       price: form.price,
+      hpp_price: form.hpp_price,
       stock: form.stock,
       category_id: form.category_id || null,
       image_url: form.image_url || null,
@@ -116,6 +117,8 @@ export default function Products() {
               <th className="px-4 py-3 font-medium w-20">Image</th>
               <th className="px-4 py-3 font-medium">Name</th>
               <th className="px-4 py-3 font-medium">Price</th>
+              <th className="px-4 py-3 font-medium">HPP</th>
+              <th className="px-4 py-3 font-medium">Margin</th>
               <th className="px-4 py-3 font-medium">Stock</th>
               <th className="px-4 py-3 font-medium w-32">Actions</th>
             </tr>
@@ -131,6 +134,8 @@ export default function Products() {
                   <div className="text-xs text-muted-foreground">{p.slug}</div>
                 </td>
                 <td className="px-4 py-3">{formatIDR(Number(p.price))}</td>
+                <td className="px-4 py-3 text-muted-foreground">{formatIDR(Number(p.hpp_price))}</td>
+                <td className="px-4 py-3 text-muted-foreground">{formatIDR(Number(p.price) - Number(p.hpp_price))}</td>
                 <td className="px-4 py-3">{p.stock}</td>
                 <td className="px-4 py-3 flex gap-2">
                   <button onClick={() => openEdit(p)} className="p-2 hover:bg-muted"><Pencil className="w-4 h-4" /></button>
@@ -139,7 +144,7 @@ export default function Products() {
               </tr>
             ))}
             {rows.length === 0 && (
-              <tr><td colSpan={5} className="px-4 py-12 text-center text-muted-foreground">No products yet.</td></tr>
+              <tr><td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">No products yet.</td></tr>
             )}
           </tbody>
         </table>
@@ -188,11 +193,17 @@ export default function Products() {
                   {cats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="text-xs uppercase tracking-wider text-muted-foreground">Price (IDR)</label>
                   <input type="number" min={0} required value={form.price}
                     onChange={e => setForm(f => ({ ...f, price: Number(e.target.value) }))}
+                    className="w-full mt-1 px-3 py-2 border border-border" />
+                </div>
+                <div>
+                  <label className="text-xs uppercase tracking-wider text-muted-foreground">HPP / Modal</label>
+                  <input type="number" min={0} required value={form.hpp_price}
+                    onChange={e => setForm(f => ({ ...f, hpp_price: Number(e.target.value) }))}
                     className="w-full mt-1 px-3 py-2 border border-border" />
                 </div>
                 <div>

@@ -53,6 +53,39 @@ export type Database = {
         }
         Relationships: []
       }
+      cash_transactions: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          description: string | null
+          id: string
+          reference_id: string | null
+          transaction_date: string
+          type: Database["public"]["Enums"]["cash_flow_type"]
+        }
+        Insert: {
+          amount?: number
+          category: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          reference_id?: string | null
+          transaction_date?: string
+          type: Database["public"]["Enums"]["cash_flow_type"]
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          reference_id?: string | null
+          transaction_date?: string
+          type?: Database["public"]["Enums"]["cash_flow_type"]
+        }
+        Relationships: []
+      }
       categories: {
         Row: {
           created_at: string
@@ -77,11 +110,93 @@ export type Database = {
         }
         Relationships: []
       }
+      order_items: {
+        Row: {
+          created_at: string
+          id: string
+          order_id: string
+          product_id: string | null
+          product_name: string
+          quantity: number
+          unit_hpp: number
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          order_id: string
+          product_id?: string | null
+          product_name: string
+          quantity?: number
+          unit_hpp?: number
+          unit_price?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          order_id?: string
+          product_id?: string | null
+          product_name?: string
+          quantity?: number
+          unit_hpp?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders: {
+        Row: {
+          created_at: string
+          customer_name: string | null
+          customer_phone: string | null
+          id: string
+          status: string
+          total_hpp: number
+          total_price: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_name?: string | null
+          customer_phone?: string | null
+          id?: string
+          status?: string
+          total_hpp?: number
+          total_price?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customer_name?: string | null
+          customer_phone?: string | null
+          id?: string
+          status?: string
+          total_hpp?: number
+          total_price?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           category_id: string | null
           created_at: string
           description: string | null
+          hpp_price: number
           id: string
           image_url: string | null
           name: string
@@ -94,6 +209,7 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           description?: string | null
+          hpp_price?: number
           id?: string
           image_url?: string | null
           name: string
@@ -106,6 +222,7 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           description?: string | null
+          hpp_price?: number
           id?: string
           image_url?: string | null
           name?: string
@@ -164,6 +281,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user"
+      cash_flow_type: "inflow" | "outflow"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -292,6 +410,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user"],
+      cash_flow_type: ["inflow", "outflow"],
     },
   },
 } as const

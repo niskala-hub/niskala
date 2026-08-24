@@ -20,6 +20,7 @@ import Dashboard from "./pages/admin/Dashboard";
 import AdminCategories from "./pages/admin/Categories";
 import AdminProducts from "./pages/admin/Products";
 import AdminBioLinks from "./pages/admin/BioLinks";
+import AdminAccounting from "./pages/admin/Accounting";
 import LinkBio from "./pages/LinkBio";
 import NotFound from "./pages/NotFound";
 
@@ -51,6 +52,7 @@ const App = () => (
                 <Route path="categories" element={<AdminCategories />} />
                 <Route path="products" element={<AdminProducts />} />
                 <Route path="bio-links" element={<AdminBioLinks />} />
+                <Route path="accounting" element={<AdminAccounting />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
