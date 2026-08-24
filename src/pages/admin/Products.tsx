@@ -134,6 +134,8 @@ export default function Products() {
                   <div className="text-xs text-muted-foreground">{p.slug}</div>
                 </td>
                 <td className="px-4 py-3">{formatIDR(Number(p.price))}</td>
+                <td className="px-4 py-3 text-muted-foreground">{formatIDR(Number(p.hpp_price))}</td>
+                <td className="px-4 py-3 text-muted-foreground">{formatIDR(Number(p.price) - Number(p.hpp_price))}</td>
                 <td className="px-4 py-3">{p.stock}</td>
                 <td className="px-4 py-3 flex gap-2">
                   <button onClick={() => openEdit(p)} className="p-2 hover:bg-muted"><Pencil className="w-4 h-4" /></button>
@@ -142,7 +144,7 @@ export default function Products() {
               </tr>
             ))}
             {rows.length === 0 && (
-              <tr><td colSpan={5} className="px-4 py-12 text-center text-muted-foreground">No products yet.</td></tr>
+              <tr><td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">No products yet.</td></tr>
             )}
           </tbody>
         </table>
