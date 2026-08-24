@@ -8,7 +8,7 @@ import { resolveProductImage } from "@/lib/productImage";
 interface Category { id: string; name: string; }
 interface Product {
   id: string; name: string; slug: string; description: string | null;
-  price: number; stock: number; image_url: string | null; category_id: string | null;
+  price: number; hpp_price: number; stock: number; image_url: string | null; category_id: string | null;
 }
 
 const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -18,7 +18,7 @@ export default function Products() {
   const [cats, setCats] = useState<Category[]>([]);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
-  const [form, setForm] = useState({ name: "", slug: "", description: "", price: 0, stock: 0, category_id: "", image_url: "" });
+  const [form, setForm] = useState({ name: "", slug: "", description: "", price: 0, hpp_price: 0, stock: 0, category_id: "", image_url: "" });
   const [uploading, setUploading] = useState(false);
   const { toast } = useToast();
 
