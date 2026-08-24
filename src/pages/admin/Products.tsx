@@ -117,6 +117,8 @@ export default function Products() {
               <th className="px-4 py-3 font-medium w-20">Image</th>
               <th className="px-4 py-3 font-medium">Name</th>
               <th className="px-4 py-3 font-medium">Price</th>
+              <th className="px-4 py-3 font-medium">HPP</th>
+              <th className="px-4 py-3 font-medium">Margin</th>
               <th className="px-4 py-3 font-medium">Stock</th>
               <th className="px-4 py-3 font-medium w-32">Actions</th>
             </tr>
@@ -189,11 +191,17 @@ export default function Products() {
                   {cats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="text-xs uppercase tracking-wider text-muted-foreground">Price (IDR)</label>
                   <input type="number" min={0} required value={form.price}
                     onChange={e => setForm(f => ({ ...f, price: Number(e.target.value) }))}
+                    className="w-full mt-1 px-3 py-2 border border-border" />
+                </div>
+                <div>
+                  <label className="text-xs uppercase tracking-wider text-muted-foreground">HPP / Modal</label>
+                  <input type="number" min={0} required value={form.hpp_price}
+                    onChange={e => setForm(f => ({ ...f, hpp_price: Number(e.target.value) }))}
                     className="w-full mt-1 px-3 py-2 border border-border" />
                 </div>
                 <div>
