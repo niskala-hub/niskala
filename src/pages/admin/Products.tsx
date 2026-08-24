@@ -36,7 +36,7 @@ export default function Products() {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ name: "", slug: "", description: "", price: 0, stock: 0, category_id: "", image_url: "" });
+    setForm({ name: "", slug: "", description: "", price: 0, hpp_price: 0, stock: 0, category_id: "", image_url: "" });
     setOpen(true);
   };
 
@@ -44,7 +44,7 @@ export default function Products() {
     setEditing(p);
     setForm({
       name: p.name, slug: p.slug, description: p.description || "",
-      price: Number(p.price), stock: p.stock,
+      price: Number(p.price), hpp_price: Number(p.hpp_price), stock: p.stock,
       category_id: p.category_id || "", image_url: p.image_url || "",
     });
     setOpen(true);
@@ -77,6 +77,7 @@ export default function Products() {
       slug: form.slug || slugify(form.name),
       description: form.description || null,
       price: form.price,
+      hpp_price: form.hpp_price,
       stock: form.stock,
       category_id: form.category_id || null,
       image_url: form.image_url || null,
