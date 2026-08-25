@@ -15,6 +15,8 @@ import {
   X,
   FileSpreadsheet,
   FileText,
+  Paperclip,
+  Upload,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -47,6 +49,7 @@ interface CashTransaction {
   amount: number;
   description: string | null;
   reference_id: string | null;
+  receipt_url: string | null;
   created_at: string;
 }
 
@@ -67,6 +70,7 @@ interface Draft {
   category: string;
   transaction_date: string;
   description: string;
+  receipt_url: string;
 }
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
@@ -77,6 +81,7 @@ const emptyDraft: Draft = {
   category: "Penjualan",
   transaction_date: todayStr(),
   description: "",
+  receipt_url: "",
 };
 
 function formatDate(value: string) {
@@ -97,6 +102,8 @@ export default function Accounting() {
   const [editing, setEditing] = useState<CashTransaction | null>(null);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const [filterFrom, setFilterFrom] = useState("");
   const [filterTo, setFilterTo] = useState("");
@@ -171,6 +178,7 @@ export default function Accounting() {
       category: t.category,
       transaction_date: t.transaction_date.slice(0, 10),
       description: t.description ?? "",
+      receipt_url: t.receipt_url ?? "",
     });
     setDialogOpen(true);
   };
@@ -181,6 +189,34 @@ export default function Accounting() {
       type,
       category: type === "inflow" ? INFLOW_CATEGORIES[0] : OUTFLOW_CATEGORIES[0],
     }));
+  };
+
+  const uploadReceipt = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Format tidak didukung", description: "Unggah file gambar (JPG/PNG).", variant: "destructive" });
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: "File terlalu besar", description: "Maksimal 10MB.", variant: "destructive" });
+      return;
+    }
+    setUploading(true);
+    try {
+      const ext = file.name.split(".").pop() || "jpg";
+      const path = `${crypto.randomUUID()}.${ext}`;
+      const { error } = await supabase.storage.from("receipts").upload(path, file);
+      if (error) throw error;
+      const { data: signed, error: sErr } = await supabase.storage
+        .from("receipts")
+        .createSignedUrl(path, 60 * 60 * 24 * 365 * 5);
+      if (sErr) throw sErr;
+      setDraft((d) => ({ ...d, receipt_url: signed.signedUrl }));
+      toast({ title: "Bukti berhasil diunggah" });
+    } catch (err: any) {
+      toast({ title: "Gagal mengunggah bukti", description: err.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
   };
 
   const save = async () => {
@@ -200,6 +236,7 @@ export default function Accounting() {
       category: draft.category,
       transaction_date: new Date(`${draft.transaction_date}T12:00:00`).toISOString(),
       description: draft.description.trim() || null,
+      receipt_url: draft.receipt_url || null,
     };
     const { error } = editing
       ? await supabase.from("cash_transactions").update(payload).eq("id", editing.id)
@@ -419,6 +456,7 @@ export default function Accounting() {
               <th className="px-4 py-3 font-medium">Tipe</th>
               <th className="px-4 py-3 font-medium">Kategori</th>
               <th className="px-4 py-3 font-medium">Keterangan</th>
+              <th className="px-4 py-3 font-medium">Bukti</th>
               <th className="px-4 py-3 font-medium text-right">Nominal</th>
               <th className="px-4 py-3 font-medium text-right w-24">Aksi</th>
             </tr>
@@ -426,11 +464,11 @@ export default function Accounting() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Memuat…</td>
+                <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">Memuat…</td>
               </tr>
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
                   Belum ada transaksi. Klik "Catat Transaksi Kas" untuk memulai.
                 </td>
               </tr>
@@ -454,6 +492,20 @@ export default function Accounting() {
                   <td className="px-4 py-3">{t.category}</td>
                   <td className="px-4 py-3 text-muted-foreground max-w-[220px] truncate" title={t.description ?? ""}>
                     {t.description ?? "—"}
+                  </td>
+                  <td className="px-4 py-3">
+                    {t.receipt_url ? (
+                      <button
+                        type="button"
+                        onClick={() => setPreviewUrl(t.receipt_url)}
+                        className="block border border-border hover:opacity-80"
+                        aria-label="Lihat bukti"
+                      >
+                        <img src={t.receipt_url} alt="Bukti transaksi" className="w-10 h-10 object-cover" />
+                      </button>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </td>
                   <td
                     className={cn(
@@ -560,10 +612,61 @@ export default function Accounting() {
                 onChange={(e) => setDraft({ ...draft, description: e.target.value })}
               />
             </div>
-            <Button onClick={save} disabled={saving} className="w-full">
+            <div>
+              <Label htmlFor="tx-receipt">Bukti Pengeluaran (Gambar)</Label>
+              <div className="mt-1 flex items-center gap-3">
+                <label
+                  htmlFor="tx-receipt"
+                  className="inline-flex items-center gap-2 border border-border px-3 py-2 text-sm cursor-pointer hover:bg-muted"
+                >
+                  {uploading ? <Upload className="w-4 h-4 animate-pulse" /> : <Paperclip className="w-4 h-4" />}
+                  {uploading ? "Mengunggah…" : draft.receipt_url ? "Ganti Gambar" : "Pilih Gambar"}
+                </label>
+                <input
+                  id="tx-receipt"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={uploading}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) uploadReceipt(file);
+                    e.target.value = "";
+                  }}
+                />
+                {draft.receipt_url && (
+                  <>
+                    <img
+                      src={draft.receipt_url}
+                      alt="Pratinjau bukti"
+                      className="w-12 h-12 object-cover border border-border"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setDraft({ ...draft, receipt_url: "" })}
+                      className="text-xs text-red-600 hover:underline"
+                    >
+                      Hapus
+                    </button>
+                  </>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">JPG/PNG, maksimal 10MB.</p>
+            </div>
+            <Button onClick={save} disabled={saving || uploading} className="w-full">
               {saving ? "Menyimpan…" : editing ? "Simpan Perubahan" : "Simpan Transaksi"}
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Preview bukti */}
+      <Dialog open={!!previewUrl} onOpenChange={(o) => !o && setPreviewUrl(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Bukti Transaksi</DialogTitle>
+          </DialogHeader>
+          {previewUrl && <img src={previewUrl} alt="Bukti transaksi" className="w-full h-auto" />}
         </DialogContent>
       </Dialog>
     </div>
