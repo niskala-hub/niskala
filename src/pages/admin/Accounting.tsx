@@ -345,9 +345,18 @@ export default function Accounting() {
           <h1 className="text-2xl md:text-3xl font-light mb-2">Accounting &amp; Keuangan</h1>
           <p className="text-sm text-muted-foreground">Buku kas real-time NISKALA.</p>
         </div>
-        <Button onClick={openCreate} className="gap-2">
-          <Plus className="w-4 h-4" /> Catat Transaksi Kas
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={exportCSV} className="gap-2">
+            <FileSpreadsheet className="w-4 h-4" /> Ekspor CSV
+          </Button>
+          <Button variant="outline" onClick={exportPDF} className="gap-2">
+            <FileText className="w-4 h-4" /> Ekspor PDF
+          </Button>
+          <Button onClick={openCreate} className="gap-2">
+            <Plus className="w-4 h-4" /> Catat Transaksi Kas
+          </Button>
+        </div>
+
       </div>
 
       {/* Executive Summary */}
