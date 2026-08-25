@@ -225,6 +225,110 @@ export default function Accounting() {
     load();
   };
 
+  const filterLabel = () => {
+    const parts: string[] = [];
+    parts.push(
+      filterFrom || filterTo
+        ? `Periode: ${filterFrom ? formatDate(filterFrom) : "awal"} – ${filterTo ? formatDate(filterTo) : "sekarang"}`
+        : "Periode: Semua tanggal"
+    );
+    parts.push(`Kategori: ${filterCategory === "all" ? "Semua" : filterCategory}`);
+    return parts.join("  |  ");
+  };
+
+  const fileSlug = () =>
+    `buku-kas-niskala${filterFrom ? `-${filterFrom}` : ""}${filterTo ? `-${filterTo}` : ""}${
+      filterCategory !== "all" ? `-${filterCategory.toLowerCase().replace(/\s+/g, "-")}` : ""
+    }`;
+
+  const filteredTotals = useMemo(() => {
+    let inflow = 0;
+    let outflow = 0;
+    for (const t of filtered) {
+      if (t.type === "inflow") inflow += Number(t.amount);
+      else outflow += Number(t.amount);
+    }
+    return { inflow, outflow, net: inflow - outflow };
+  }, [filtered]);
+
+  const exportCSV = () => {
+    if (filtered.length === 0) {
+      toast({ title: "Tidak ada data untuk diekspor", variant: "destructive" });
+      return;
+    }
+    const esc = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
+    const rows: string[] = [];
+    rows.push(esc("Buku Kas NISKALA"));
+    rows.push(esc(filterLabel()));
+    rows.push("");
+    rows.push(["Tanggal", "Tipe", "Kategori", "Keterangan", "Nominal (Rp)"].map(esc).join(","));
+    for (const t of filtered) {
+      rows.push(
+        [
+          formatDate(t.transaction_date),
+          t.type === "inflow" ? "Masuk" : "Keluar",
+          t.category,
+          t.description ?? "",
+          (t.type === "inflow" ? 1 : -1) * Number(t.amount),
+        ]
+          .map(esc)
+          .join(",")
+      );
+    }
+    rows.push("");
+    rows.push([esc("Total Pemasukan"), "", "", "", esc(filteredTotals.inflow)].join(","));
+    rows.push([esc("Total Pengeluaran"), "", "", "", esc(filteredTotals.outflow)].join(","));
+    rows.push([esc("Saldo Bersih"), "", "", "", esc(filteredTotals.net)].join(","));
+
+    const blob = new Blob(["\uFEFF" + rows.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${fileSlug()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: "CSV berhasil diunduh" });
+  };
+
+  const exportPDF = () => {
+    if (filtered.length === 0) {
+      toast({ title: "Tidak ada data untuk diekspor", variant: "destructive" });
+      return;
+    }
+    const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+    doc.setFontSize(16);
+    doc.text("Buku Kas NISKALA", 40, 40);
+    doc.setFontSize(9);
+    doc.setTextColor(110);
+    doc.text(filterLabel(), 40, 58);
+    doc.text(`Dicetak: ${formatDate(new Date().toISOString())}`, 40, 72);
+
+    autoTable(doc, {
+      startY: 90,
+      head: [["Tanggal", "Tipe", "Kategori", "Keterangan", "Nominal"]],
+      body: filtered.map((t) => [
+        formatDate(t.transaction_date),
+        t.type === "inflow" ? "Masuk" : "Keluar",
+        t.category,
+        t.description ?? "-",
+        `${t.type === "inflow" ? "+" : "-"} ${formatIDR(Number(t.amount))}`,
+      ]),
+      styles: { fontSize: 9, cellPadding: 5 },
+      headStyles: { fillColor: [51, 44, 43], textColor: 255 },
+      columnStyles: { 4: { halign: "right" } },
+      foot: [
+        ["", "", "", "Total Pemasukan", formatIDR(filteredTotals.inflow)],
+        ["", "", "", "Total Pengeluaran", formatIDR(filteredTotals.outflow)],
+        ["", "", "", "Saldo Bersih", formatIDR(filteredTotals.net)],
+      ],
+      footStyles: { fillColor: [245, 243, 240], textColor: 40, halign: "right" },
+    });
+
+    doc.save(`${fileSlug()}.pdf`);
+    toast({ title: "PDF berhasil diunduh" });
+  };
+
+
   const categories = draft.type === "inflow" ? INFLOW_CATEGORIES : OUTFLOW_CATEGORIES;
 
   const cards = [
