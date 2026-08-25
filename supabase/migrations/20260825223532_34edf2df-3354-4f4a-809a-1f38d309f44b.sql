@@ -1,0 +1,1 @@
+ALTER TABLE public.cash_transactions ADD COLUMN IF NOT EXISTS receipt_url text;

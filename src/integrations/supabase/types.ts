@@ -60,6 +60,7 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          receipt_url: string | null
           reference_id: string | null
           transaction_date: string
           type: Database["public"]["Enums"]["cash_flow_type"]
@@ -70,6 +71,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          receipt_url?: string | null
           reference_id?: string | null
           transaction_date?: string
           type: Database["public"]["Enums"]["cash_flow_type"]
@@ -80,6 +82,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          receipt_url?: string | null
           reference_id?: string | null
           transaction_date?: string
           type?: Database["public"]["Enums"]["cash_flow_type"]
