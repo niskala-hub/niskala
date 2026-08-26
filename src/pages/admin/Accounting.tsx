@@ -413,18 +413,18 @@ export default function Accounting() {
 
       {/* Filters */}
       <div className="flex flex-wrap items-end gap-3 mb-4">
-        <div>
+        <div className="w-full sm:w-auto">
           <Label className="text-xs text-muted-foreground">Dari tanggal</Label>
-          <Input type="date" value={filterFrom} onChange={(e) => setFilterFrom(e.target.value)} className="w-36" />
+          <Input type="date" value={filterFrom} onChange={(e) => setFilterFrom(e.target.value)} className="w-full sm:w-36" />
         </div>
-        <div>
+        <div className="w-full sm:w-auto">
           <Label className="text-xs text-muted-foreground">Sampai</Label>
-          <Input type="date" value={filterTo} onChange={(e) => setFilterTo(e.target.value)} className="w-36" />
+          <Input type="date" value={filterTo} onChange={(e) => setFilterTo(e.target.value)} className="w-full sm:w-36" />
         </div>
-        <div>
+        <div className="w-full sm:w-auto">
           <Label className="text-xs text-muted-foreground">Kategori</Label>
           <Select value={filterCategory} onValueChange={setFilterCategory}>
-            <SelectTrigger className="w-44">
+            <SelectTrigger className="w-full sm:w-44">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -447,8 +447,78 @@ export default function Accounting() {
         )}
       </div>
 
-      {/* Ledger */}
-      <div className="border border-border overflow-x-auto">
+      {/* Mobile cards */}
+      <div className="md:hidden space-y-3">
+        {loading ? (
+          <p className="border border-border py-8 text-center text-sm text-muted-foreground">Memuat…</p>
+        ) : filtered.length === 0 ? (
+          <p className="border border-border py-8 text-center text-sm text-muted-foreground">
+            Belum ada transaksi. Klik "Catat Transaksi Kas" untuk memulai.
+          </p>
+        ) : (
+          filtered.map((t) => (
+            <div key={t.id} className="border border-border p-3">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "rounded-none text-[10px]",
+                        t.type === "inflow"
+                          ? "border-emerald-600 text-emerald-700"
+                          : "border-red-600 text-red-600"
+                      )}
+                    >
+                      {t.type === "inflow" ? "Masuk" : "Keluar"}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">{t.category}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{formatDate(t.transaction_date)}</p>
+                </div>
+                <p
+                  className={cn(
+                    "text-sm font-medium whitespace-nowrap shrink-0",
+                    t.type === "inflow" ? "text-emerald-700" : "text-red-600"
+                  )}
+                >
+                  {t.type === "inflow" ? "+" : "−"} {formatIDR(Number(t.amount))}
+                </p>
+              </div>
+              {t.description && (
+                <p className="text-xs text-muted-foreground mb-2 line-clamp-2">{t.description}</p>
+              )}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  {t.receipt_url ? (
+                    <button
+                      type="button"
+                      onClick={() => setPreviewUrl(t.receipt_url)}
+                      className="border border-border hover:opacity-80"
+                      aria-label="Lihat bukti"
+                    >
+                      <img src={t.receipt_url} alt="Bukti" className="w-8 h-8 object-cover" />
+                    </button>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">No receipt</span>
+                  )}
+                </div>
+                <div className="flex gap-1">
+                  <button onClick={() => openEdit(t)} className="p-2 hover:bg-muted" aria-label="Edit">
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => remove(t.id)} className="p-2 hover:bg-muted text-red-600" aria-label="Hapus">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop table */}
+      <div className="hidden md:block border border-border overflow-x-auto">
         <table className="w-full text-sm min-w-[640px]">
           <thead>
             <tr className="text-left text-muted-foreground">

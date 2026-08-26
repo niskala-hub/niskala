@@ -15,6 +15,7 @@ interface DBProduct {
   stock: number;
   description: string | null;
   image_url: string | null;
+  image_urls: string[] | null;
 }
 
 export default function ProductDetail() {
@@ -23,15 +24,37 @@ export default function ProductDetail() {
   const [related, setRelated] = useState<DBProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
+  const [selectedIdx, setSelectedIdx] = useState(0);
   const { addItem } = useCart();
   const { toast } = useToast();
+
+  /* ── Build deduplicated image list ── */
+  const buildImageList = (p: DBProduct): string[] => {
+    const urls: string[] = [];
+    if (p.image_urls && p.image_urls.length > 0) {
+      urls.push(...p.image_urls);
+    } else if (p.image_url) {
+      urls.push(p.image_url);
+    }
+    // deduplicate while preserving order
+    const seen = new Set<string>();
+    const unique = urls.filter(u => {
+      if (!u || seen.has(u)) return false;
+      seen.add(u);
+      return true;
+    });
+    // cap at 4 images max
+    const capped = unique.slice(0, 4);
+    return capped.length > 0 ? capped : [resolveProductImage(null)];
+  };
 
   useEffect(() => {
     if (!slug) return;
     setLoading(true);
+    setSelectedIdx(0);
     supabase
       .from("products")
-      .select("id,slug,name,price,stock,description,image_url")
+      .select("id,slug,name,price,stock,description,image_url,image_urls")
       .eq("slug", slug)
       .maybeSingle()
       .then(({ data }) => {
@@ -54,13 +77,14 @@ export default function ProductDetail() {
   }
   if (!product) return <Navigate to="/shop" replace />;
 
-  const image = resolveProductImage(product.image_url);
+  const images = buildImageList(product);
+  const mainImage = images[selectedIdx] || images[0];
   const isSoldOut = product.stock <= 0;
 
   const handleAddToCart = () => {
     if (isSoldOut) return;
     addItem(
-      { slug: product.slug, name: product.name, price: Number(product.price), image },
+      { slug: product.slug, name: product.name, price: Number(product.price), image: images[0] },
       quantity,
     );
     toast({
@@ -80,8 +104,44 @@ export default function ProductDetail() {
         </nav>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 lg:gap-16 items-start">
-          <div className="w-full aspect-[4/5] bg-warm-bg">
-            <img src={image} alt={product.name} className="w-full h-full object-cover" />
+          {/* ── Image gallery ── */}
+          <div className="flex flex-col gap-3">
+            {/* Main image */}
+            <div className="w-full aspect-[4/5] bg-warm-bg overflow-hidden">
+              <img
+                key={mainImage}
+                src={mainImage}
+                alt={product.name}
+                className="w-full h-full object-cover animate-[fadeIn_0.3s_ease]"
+              />
+            </div>
+
+            {/* Thumbnails — 4-col grid, no empty space */}
+            {images.length > 1 && (
+              <div className="grid grid-cols-4 gap-2">
+                {images.map((url, i) => (
+                  <button
+                    key={url + i}
+                    onClick={() => setSelectedIdx(i)}
+                    className={`
+                      w-full aspect-square overflow-hidden border-2 transition-all duration-200
+                      ${i === selectedIdx
+                        ? "border-primary ring-1 ring-primary/30 opacity-100"
+                        : "border-transparent opacity-60 hover:opacity-100"
+                      }
+                    `}
+                    aria-label={`View image ${i + 1}`}
+                  >
+                    <img
+                      src={url}
+                      alt={`${product.name} ${i + 1}`}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col">

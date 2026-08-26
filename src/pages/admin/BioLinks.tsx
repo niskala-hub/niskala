@@ -190,20 +190,60 @@ export default function AdminBioLinks() {
   };
 
   return (
-    <div className="p-10">
-      <div className="flex items-center justify-between mb-8">
+    <div className="p-4 md:p-10">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6 md:mb-8">
         <div>
-          <h1 className="text-3xl font-light">Bio Links</h1>
+          <h1 className="text-2xl md:text-3xl font-light">Bio Links</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {rows.length} total · drag rows to reorder · public page at /links
+            {rows.length} total · public page at /links
           </p>
         </div>
-        <button onClick={openNew} className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground text-sm">
+        <button onClick={openNew} className="flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground text-sm">
           <Plus className="w-4 h-4" /> New link
         </button>
       </div>
 
-      <div className="border border-border">
+      {/* Mobile cards */}
+      <div className="md:hidden space-y-3">
+        {rows.map(l => (
+          <div key={l.id} className="border border-border p-3">
+            <div className="flex items-start gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs text-muted-foreground font-mono">#{l.order}</span>
+                  <span className="text-sm font-medium truncate">{l.title}</span>
+                </div>
+                <p className="text-xs text-muted-foreground truncate mb-2">{l.url}</p>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                  <span className="inline-flex items-center gap-1">
+                    <MousePointerClick className="w-3 h-3" /> {l.clicks} clicks
+                  </span>
+                  <span>{l.icon}</span>
+                  <span>Last: {formatLastClick(l.last_click_at)}</span>
+                </div>
+              </div>
+              <div className="flex flex-col items-end gap-1 shrink-0">
+                <button
+                  onClick={() => toggleActive(l)}
+                  className={`text-xs px-2 py-1 border ${l.is_active ? "border-accent text-accent" : "border-border text-muted-foreground"}`}
+                >
+                  {l.is_active ? "Active" : "Hidden"}
+                </button>
+                <div className="flex gap-1">
+                  <button onClick={() => openEdit(l)} className="p-2 hover:bg-muted"><Pencil className="w-4 h-4" /></button>
+                  <button onClick={() => remove(l.id)} className="p-2 hover:bg-muted text-destructive"><Trash2 className="w-4 h-4" /></button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+        {rows.length === 0 && (
+          <p className="border border-border py-10 text-center text-sm text-muted-foreground">No links yet.</p>
+        )}
+      </div>
+
+      {/* Desktop table */}
+      <div className="hidden md:block border border-border">
         <table className="w-full text-sm">
           <thead className="bg-muted text-left">
             <tr>
@@ -234,26 +274,26 @@ export default function AdminBioLinks() {
       </div>
 
       {open && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-background w-full max-w-md p-6 relative">
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-start sm:items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-background w-full max-w-md p-4 sm:p-6 relative my-4 sm:my-8">
             <button onClick={() => setOpen(false)} className="absolute top-4 right-4"><X className="w-4 h-4" /></button>
-            <h2 className="text-xl font-light mb-6">{editing ? "Edit" : "New"} link</h2>
+            <h2 className="text-lg sm:text-xl font-light mb-5">{editing ? "Edit" : "New"} link</h2>
             <form onSubmit={save} className="space-y-4">
               <div>
                 <label className="text-xs uppercase tracking-wider text-muted-foreground">Title (name)</label>
                 <input required value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))}
-                  className="w-full mt-1 px-3 py-2 border border-border" />
+                  className="w-full mt-1 px-3 py-2.5 border border-border" />
               </div>
               <div>
                 <label className="text-xs uppercase tracking-wider text-muted-foreground">URL</label>
                 <input required type="url" value={draft.url} onChange={e => setDraft(d => ({ ...d, url: e.target.value }))}
                   placeholder="https://…"
-                  className="w-full mt-1 px-3 py-2 border border-border font-mono text-sm" />
+                  className="w-full mt-1 px-3 py-2.5 border border-border font-mono text-sm" />
               </div>
               <div>
                 <label className="text-xs uppercase tracking-wider text-muted-foreground">Icon</label>
                 <select value={draft.icon} onChange={e => setDraft(d => ({ ...d, icon: e.target.value }))}
-                  className="w-full mt-1 px-3 py-2 border border-border bg-background">
+                  className="w-full mt-1 px-3 py-2.5 border border-border bg-background">
                   {ICON_NAMES.map(n => <option key={n} value={n}>{n}</option>)}
                 </select>
               </div>
@@ -261,7 +301,7 @@ export default function AdminBioLinks() {
                 <input type="checkbox" checked={draft.is_active} onChange={e => setDraft(d => ({ ...d, is_active: e.target.checked }))} />
                 Active (visible on public page)
               </label>
-              <button type="submit" className="w-full py-2 bg-primary text-primary-foreground text-sm">Save</button>
+              <button type="submit" className="w-full py-2.5 bg-primary text-primary-foreground text-sm">Save</button>
             </form>
           </div>
         </div>

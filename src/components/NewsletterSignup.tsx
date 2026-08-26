@@ -27,8 +27,8 @@ export default function NewsletterSignup() {
     >
       <div className="absolute inset-0 bg-foreground/40" />
       <div className="relative z-10 max-w-md mx-auto text-center text-white px-2">
-        <h2 className="text-2xl md:text-3xl lg:text-4xl font-light mb-3 tracking-wide">Monthly Dispatch</h2>
-        <p className="text-sm mb-6 md:mb-8 text-white/80">Sign up to receive news and updates.</p>
+        <h2 className="text-2xl md:text-3xl lg:text-4xl font-light mb-3 tracking-wide">Elevate Daily Lounging</h2>
+        <p className="text-sm mb-6 md:mb-8 text-white/80">Temukan koleksi piyama premium dan daster paling flowy di kotak masuk Anda.</p>
         <form onSubmit={handleSubmit} className="flex gap-0">
           <input
             type="email"

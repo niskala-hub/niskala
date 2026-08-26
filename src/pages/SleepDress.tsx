@@ -59,7 +59,7 @@ export default function SleepDress() {
           Effortless comfort, everyday elegance.
         </h2>
         <p className="text-base leading-relaxed text-muted-foreground mb-6">
-          The Sleep Dress mewakili fondasi dari Niskala — pakaian rumah harian yang dirancang untuk merayakan waktu istirahat Anda. Setiap potongannya dikonstruksi dari material Rayon Crinkle dan Twill yang sangat jatuh dan sejuk di kulit. Diselesaikan dengan palet warna earth-toned yang tenang, menjadikannya kanvas yang sempurna untuk dikenakan dari pagi hingga malam.
+          The Sleep Dress mewakili fondasi dari Niskala — Niskala merangkul keceriaan melalui eksplorasi motif yang kaya dan palet warna-warni yang hidup. Dari kesegaran corak floral (bunga) yang membangkitkan suasana hati, hingga pesona ritmis dari motif polkadot yang ekspresif. Setiap rona dan pola ini dipilih secara saksama untuk mewakili karakter Anda, menghadirkan percikan kebahagiaan (mood-boosting) di setiap momen istirahat Anda.
         </p>
         <p className="text-base leading-relaxed text-muted-foreground">
           Terinspirasi dari kebutuhan akan kepraktisan tanpa mengorbankan estetika, siluet A-Line kami memberikan ruang gerak tak terbatas. Material yang sepenuhnya ironless memastikan Anda selalu tampil rapi tanpa usaha ekstra.
