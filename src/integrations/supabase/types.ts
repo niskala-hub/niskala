@@ -202,6 +202,7 @@ export type Database = {
           hpp_price: number
           id: string
           image_url: string | null
+          image_urls: string[]
           name: string
           price: number
           slug: string
@@ -215,6 +216,7 @@ export type Database = {
           hpp_price?: number
           id?: string
           image_url?: string | null
+          image_urls?: string[]
           name: string
           price?: number
           slug: string
@@ -228,6 +230,7 @@ export type Database = {
           hpp_price?: number
           id?: string
           image_url?: string | null
+          image_urls?: string[]
           name?: string
           price?: number
           slug?: string
@@ -283,7 +286,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "user"
+      app_role: "admin" | "user" | "owner"
       cash_flow_type: "inflow" | "outflow"
     }
     CompositeTypes: {
@@ -412,7 +415,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "user"],
+      app_role: ["admin", "user", "owner"],
       cash_flow_type: ["inflow", "outflow"],
     },
   },
