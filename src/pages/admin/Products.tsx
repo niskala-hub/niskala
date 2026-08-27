@@ -4,6 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Pencil, Trash2, Plus, X, Upload } from "lucide-react";
 import { formatIDR } from "@/lib/currency";
 import { resolveProductImage } from "@/lib/productImage";
+import ProductVariants from "@/components/admin/ProductVariants";
 
 interface Category { id: string; name: string; }
 interface Product {
@@ -105,12 +106,19 @@ export default function Products() {
       image_url: imgs[0] || null,
       image_urls: imgs,
     };
-    const { error } = editing
-      ? await supabase.from("products").update(payload).eq("id", editing.id)
-      : await supabase.from("products").insert(payload);
+    if (editing) {
+      const { error } = await supabase.from("products").update(payload).eq("id", editing.id);
+      if (error) return toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: "Product updated" });
+      setOpen(false);
+      load();
+      return;
+    }
+    const { data, error } = await supabase.from("products").insert(payload).select().maybeSingle();
     if (error) return toast({ title: "Error", description: error.message, variant: "destructive" });
-    toast({ title: editing ? "Product updated" : "Product created" });
-    setOpen(false); load();
+    toast({ title: "Produk dibuat", description: "Lanjutkan menambahkan model & motif." });
+    if (data) setEditing(data as Product);
+    load();
   };
 
   const remove = async (id: string) => {
@@ -286,13 +294,20 @@ export default function Products() {
                     className="w-full mt-1 px-3 py-2.5 border border-border" />
                 </div>
               </div>
+              {editing ? (
+                <ProductVariants productId={editing.id} />
+              ) : (
+                <p className="border border-dashed border-border p-3 text-xs text-muted-foreground">
+                  Simpan produk dulu, lalu tambahkan Model & Motif di form ini.
+                </p>
+              )}
               <div>
                 <label className="text-xs uppercase tracking-wider text-muted-foreground">Description</label>
                 <textarea rows={4} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
                   className="w-full mt-1 px-3 py-2.5 border border-border" />
               </div>
               <button type="submit" disabled={uploading} className="w-full py-2.5 bg-primary text-primary-foreground text-sm disabled:opacity-50">
-                Save
+                {editing ? "Simpan perubahan" : "Simpan & lanjut ke Model/Motif"}
               </button>
             </form>
           </div>
