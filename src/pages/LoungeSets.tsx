@@ -82,7 +82,7 @@ export default function LoungeSets() {
                     <img
                       src={resolveProductImage(p.image_url, "pajamas")}
                       alt={p.name}
-                      className="w-full aspect-square object-cover transition-transform duration-500 group-hover:scale-105"
+                      className="w-full aspect-[4/5] object-cover object-center transition-transform duration-500 group-hover:scale-105"
                       loading="lazy"
                     />
                   </div>
