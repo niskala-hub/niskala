@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { formatIDR } from "@/lib/currency";
 import { resolveProductImage } from "@/lib/productImage";
-import { Check } from "lucide-react";
+import { Check, ZoomIn, X, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface DBProduct {
   id: string;
@@ -32,6 +32,13 @@ interface Model {
   product_motifs: Motif[];
 }
 
+interface Size {
+  id: string;
+  category: string;
+  ld: number;
+  sort_order: number;
+}
+
 export default function ProductDetail() {
   const { slug } = useParams<{ slug: string }>();
   const [product, setProduct] = useState<DBProduct | null>(null);
@@ -41,6 +48,9 @@ export default function ProductDetail() {
   const [modelId, setModelId] = useState<string | null>(null);
   const [motifId, setMotifId] = useState<string | null>(null);
   const [activeImage, setActiveImage] = useState<string | null>(null);
+  const [sizes, setSizes] = useState<Size[]>([]);
+  const [sizeId, setSizeId] = useState<string | null>(null);
+  const [lightbox, setLightbox] = useState<number | null>(null);
   const { toast } = useToast();
 
   const buildImageList = (p: DBProduct): string[] => {
@@ -63,6 +73,8 @@ export default function ProductDetail() {
     setModelId(null);
     setMotifId(null);
     setActiveImage(null);
+    setSizeId(null);
+    setLightbox(null);
 
     (async () => {
       const { data } = await supabase
@@ -75,7 +87,7 @@ export default function ProductDetail() {
       setLoading(false);
       if (!data) return;
 
-      const [{ data: mods }, { data: rel }] = await Promise.all([
+      const [{ data: mods }, { data: rel }, { data: szs }] = await Promise.all([
         supabase
           .from("product_models")
           .select("id,name,sort_order,product_motifs(id,name,image_url,stock,sort_order)")
@@ -87,6 +99,11 @@ export default function ProductDetail() {
           .neq("slug", slug)
           .gt("stock", 0)
           .limit(3),
+        supabase
+          .from("product_sizes")
+          .select("id,category,ld,sort_order")
+          .eq("product_id", data.id)
+          .order("sort_order"),
       ]);
       if (cancelled) return;
       const sorted = ((mods as Model[]) || []).map(m => ({
@@ -96,6 +113,7 @@ export default function ProductDetail() {
       setModels(sorted);
       if (sorted.length > 0) setModelId(sorted[0].id);
       setRelated((rel as DBProduct[]) || []);
+      setSizes((szs as Size[]) || []);
     })();
 
     return () => {
@@ -119,8 +137,10 @@ export default function ProductDetail() {
     ...images,
   ].filter((u, i, arr) => arr.indexOf(u) === i);
 
+  const selectedSize = sizes.find(s => s.id === sizeId) || null;
   const hasVariants = models.length > 0;
-  const needsChoice = hasVariants && (!modelId || (motifs.length > 0 && !motifId));
+  const needsChoice =
+    (hasVariants && (!modelId || (motifs.length > 0 && !motifId))) || (sizes.length > 0 && !sizeId);
   const isSoldOut =
     product.stock <= 0 || (selectedMotif ? selectedMotif.stock <= 0 : false);
 
@@ -128,7 +148,9 @@ export default function ProductDetail() {
     typeof window !== "undefined" ? `${window.location.origin}/product/${product.slug}` : "";
   const waText = `Halo NISKALA, saya ingin memesan:\n\n${product.name}${
     selectedModel ? `\nModel: ${selectedModel.name}` : ""
-  }${selectedMotif ? `\nMotif: ${selectedMotif.name}` : ""}\n${productUrl}`;
+  }${selectedMotif ? `\nMotif: ${selectedMotif.name}` : ""}${
+    selectedSize ? `\nSize: ${selectedSize.category} (LD ${selectedSize.ld} cm)` : ""
+  }\n${productUrl}`;
 
   const selectModel = (id: string) => {
     setModelId(id);
@@ -153,14 +175,22 @@ export default function ProductDetail() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 lg:gap-16 items-start">
           {/* ── Gallery ── */}
           <div className="lg:sticky lg:top-24 flex flex-col gap-3">
-            <div className="w-full aspect-[4/5] bg-[hsl(var(--warm-bg))] overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setLightbox(Math.max(0, galleryThumbs.indexOf(mainImage)))}
+              className="group relative w-full aspect-[4/5] bg-[hsl(var(--warm-bg))] overflow-hidden cursor-zoom-in"
+              aria-label="Perbesar gambar"
+            >
               <img
                 key={mainImage}
                 src={mainImage}
                 alt={`${product.name}${selectedMotif ? ` – motif ${selectedMotif.name}` : ""}`}
-                className="w-full h-full object-cover animate-[fadeIn_0.3s_ease]"
+                className="w-full h-full object-cover object-center animate-[fadeIn_0.3s_ease] transition-transform duration-500 group-hover:scale-[1.03]"
               />
-            </div>
+              <span className="absolute bottom-3 right-3 flex items-center gap-1 bg-background/85 text-foreground text-[11px] px-2 py-1">
+                <ZoomIn className="w-3.5 h-3.5" /> Zoom
+              </span>
+            </button>
 
             {galleryThumbs.length > 1 && (
               <div className="grid grid-cols-5 gap-2">
@@ -170,14 +200,14 @@ export default function ProductDetail() {
                     <button
                       key={url + i}
                       onClick={() => setActiveImage(url)}
-                      className={`w-full aspect-square overflow-hidden border transition-all duration-200 ${
+                      className={`w-full aspect-[4/5] overflow-hidden border transition-all duration-200 ${
                         active
                           ? "border-primary opacity-100"
                           : "border-border opacity-60 hover:opacity-100"
                       }`}
                       aria-label={`Lihat gambar ${i + 1}`}
                     >
-                      <img src={url} alt="" className="w-full h-full object-cover" loading="lazy" />
+                      <img src={url} alt="" className="w-full h-full object-cover object-center" loading="lazy" />
                     </button>
                   );
                 })}
@@ -200,6 +230,35 @@ export default function ProductDetail() {
               <p className="text-sm md:text-base leading-relaxed text-muted-foreground mb-6 md:mb-8">
                 {product.description}
               </p>
+            )}
+
+            {sizes.length > 0 && (
+              <div className="mb-8">
+                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-3">
+                  Pilih Size
+                  {selectedSize && (
+                    <span className="ml-2 normal-case tracking-normal text-foreground">
+                      {selectedSize.category} · LD {selectedSize.ld} cm
+                    </span>
+                  )}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {sizes.map(s => (
+                    <button
+                      key={s.id}
+                      onClick={() => setSizeId(s.id)}
+                      className={`px-4 py-2 text-sm border text-left transition-colors ${
+                        s.id === sizeId
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border text-foreground hover:border-primary"
+                      }`}
+                    >
+                      {s.category}
+                      <span className="block text-[11px] opacity-80">LD {s.ld} cm</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
 
             {hasVariants && (
@@ -280,7 +339,7 @@ export default function ProductDetail() {
               </button>
             ) : needsChoice ? (
               <button disabled className="w-full py-3 bg-muted text-muted-foreground text-sm font-medium cursor-not-allowed">
-                Pilih model & motif terlebih dahulu
+                Pilih size, model & motif terlebih dahulu
               </button>
             ) : (
               <a
@@ -295,6 +354,50 @@ export default function ProductDetail() {
           </div>
         </div>
       </section>
+
+      {lightbox !== null && galleryThumbs[lightbox] && (
+        <div
+          className="fixed inset-0 z-50 bg-foreground/95 flex items-center justify-center p-4"
+          onClick={() => setLightbox(null)}
+        >
+          <button
+            onClick={() => setLightbox(null)}
+            className="absolute top-4 right-4 p-2 text-background"
+            aria-label="Tutup"
+          >
+            <X className="w-6 h-6" />
+          </button>
+
+          {galleryThumbs.length > 1 && (
+            <>
+              <button
+                onClick={e => { e.stopPropagation(); setLightbox((lightbox - 1 + galleryThumbs.length) % galleryThumbs.length); }}
+                className="absolute left-2 md:left-6 p-2 text-background"
+                aria-label="Sebelumnya"
+              >
+                <ChevronLeft className="w-7 h-7" />
+              </button>
+              <button
+                onClick={e => { e.stopPropagation(); setLightbox((lightbox + 1) % galleryThumbs.length); }}
+                className="absolute right-2 md:right-6 p-2 text-background"
+                aria-label="Berikutnya"
+              >
+                <ChevronRight className="w-7 h-7" />
+              </button>
+            </>
+          )}
+
+          <img
+            src={galleryThumbs[lightbox]}
+            alt={product.name}
+            onClick={e => e.stopPropagation()}
+            className="max-h-[85vh] max-w-full object-contain"
+          />
+          <span className="absolute bottom-5 text-background/80 text-xs">
+            {lightbox + 1} / {galleryThumbs.length}
+          </span>
+        </div>
+      )}
 
       {related.length > 0 && (
         <section className="max-w-6xl mx-auto px-4 md:px-6 py-12 md:py-16">

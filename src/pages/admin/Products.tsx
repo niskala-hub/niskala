@@ -5,6 +5,7 @@ import { Pencil, Trash2, Plus, X, Upload } from "lucide-react";
 import { formatIDR } from "@/lib/currency";
 import { resolveProductImage } from "@/lib/productImage";
 import ProductVariants from "@/components/admin/ProductVariants";
+import ProductSizes from "@/components/admin/ProductSizes";
 
 interface Category { id: string; name: string; }
 interface Product {
@@ -13,7 +14,7 @@ interface Product {
   image_urls: string[] | null; category_id: string | null;
 }
 
-const MAX_IMAGES = 4;
+const MAX_IMAGES = 5;
 const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
 export default function Products() {
@@ -60,7 +61,7 @@ export default function Products() {
   const upload = async (files: FileList) => {
     const remaining = MAX_IMAGES - form.image_urls.length;
     if (remaining <= 0) {
-      return toast({ title: "Maksimal 4 gambar", variant: "destructive" });
+      return toast({ title: `Maksimal ${MAX_IMAGES} gambar`, variant: "destructive" });
     }
     const list = Array.from(files).slice(0, remaining);
     setUploading(true);
@@ -226,7 +227,7 @@ export default function Products() {
                 <label className="text-xs uppercase tracking-wider text-muted-foreground">
                   Images ({form.image_urls.length}/{MAX_IMAGES})
                 </label>
-                <div className="mt-2 grid grid-cols-4 gap-2">
+                <div className="mt-2 grid grid-cols-3 sm:grid-cols-5 gap-2">
                   {form.image_urls.map((url, i) => (
                     <div key={url} className="relative aspect-square border border-border">
                       <img src={url} alt="" className="w-full h-full object-cover" />
@@ -251,7 +252,7 @@ export default function Products() {
                     </label>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">Maksimal 4 gambar. Gambar pertama menjadi gambar utama.</p>
+                <p className="text-xs text-muted-foreground mt-2">Maksimal 5 gambar. Gambar pertama menjadi gambar utama.</p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
@@ -295,10 +296,13 @@ export default function Products() {
                 </div>
               </div>
               {editing ? (
-                <ProductVariants productId={editing.id} />
+                <>
+                  <ProductSizes productId={editing.id} />
+                  <ProductVariants productId={editing.id} />
+                </>
               ) : (
                 <p className="border border-dashed border-border p-3 text-xs text-muted-foreground">
-                  Simpan produk dulu, lalu tambahkan Model & Motif di form ini.
+                  Simpan produk dulu, lalu tambahkan Size, Model & Motif di form ini.
                 </p>
               )}
               <div>
@@ -307,7 +311,7 @@ export default function Products() {
                   className="w-full mt-1 px-3 py-2.5 border border-border" />
               </div>
               <button type="submit" disabled={uploading} className="w-full py-2.5 bg-primary text-primary-foreground text-sm disabled:opacity-50">
-                {editing ? "Simpan perubahan" : "Simpan & lanjut ke Model/Motif"}
+                {editing ? "Simpan perubahan" : "Simpan & lanjut ke Size/Model/Motif"}
               </button>
             </form>
           </div>

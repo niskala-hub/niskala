@@ -270,6 +270,44 @@ export type Database = {
           },
         ]
       }
+      product_sizes: {
+        Row: {
+          category: Database["public"]["Enums"]["size_category"]
+          created_at: string
+          id: string
+          ld: number
+          product_id: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          category?: Database["public"]["Enums"]["size_category"]
+          created_at?: string
+          id?: string
+          ld?: number
+          product_id: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["size_category"]
+          created_at?: string
+          id?: string
+          ld?: number
+          product_id?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_sizes_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           category_id: string | null
@@ -385,6 +423,7 @@ export type Database = {
     Enums: {
       app_role: "admin" | "user" | "owner"
       cash_flow_type: "inflow" | "outflow"
+      size_category: "Reguler" | "Jumbo Size"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -514,6 +553,7 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "user", "owner"],
       cash_flow_type: ["inflow", "outflow"],
+      size_category: ["Reguler", "Jumbo Size"],
     },
   },
 } as const
