@@ -5,32 +5,86 @@ import coreCollection from "@/assets/collections/core-collection.jpg";
 import setsAndPairs from "@/assets/collections/sets-and-pairs.jpg";
 import NewsletterSignup from "@/components/NewsletterSignup";
 import { featuredProducts as fallbackFeatured } from "@/data/products";
-import { formatIDR } from "@/lib/currency";
 import { supabase } from "@/integrations/supabase/client";
 import { resolveProductImage } from "@/lib/productImage";
+import ProductCard from "@/components/ProductCard";
 
-interface DBProduct { slug: string; name: string; price: number; image_url: string | null; }
-interface DBCategory { id: string; slug: string; name: string; }
+interface DBProduct {
+  slug: string;
+  name: string;
+  price: number;
+  original_price: number | null;
+  status: string | null;
+  stock: number;
+  image_url: string | null;
+}
 
 export default function Index() {
   const [dbProducts, setDbProducts] = useState<DBProduct[] | null>(null);
-  const [dbCategories, setDbCategories] = useState<DBCategory[]>([]);
+  const [categoryCounts, setCategoryCounts] = useState<{ daster: number; pajamas: number }>({ daster: 0, pajamas: 0 });
 
   useEffect(() => {
-    supabase.from("products").select("slug,name,price,image_url").order("created_at", { ascending: false }).limit(3)
-      .then(({ data }) => setDbProducts(data || []));
-    supabase.from("categories").select("id,slug,name").order("name")
-      .then(({ data }) => setDbCategories(data || []));
+    (async () => {
+      // 1. Fetch featured products
+      const { data: pData } = await supabase
+        .from("products")
+        .select("slug,name,price,original_price,status,stock,image_url")
+        .order("created_at", { ascending: false })
+        .limit(3);
+      setDbProducts(pData || []);
+
+      // 2. Fetch categories with slug 'daster' and 'pajamas'
+      const { data: cats } = await supabase
+        .from("categories")
+        .select("id,slug")
+        .in("slug", ["daster", "pajamas"]);
+
+      const dasterCat = cats?.find(c => c.slug === "daster");
+      const pajamasCat = cats?.find(c => c.slug === "pajamas");
+
+      let dasterCount = 0;
+      let pajamasCount = 0;
+
+      if (dasterCat) {
+        const { count } = await supabase
+          .from("products")
+          .select("*", { count: "exact", head: true })
+          .eq("category_id", dasterCat.id);
+        dasterCount = count ?? 0;
+      }
+
+      if (pajamasCat) {
+        const { count } = await supabase
+          .from("products")
+          .select("*", { count: "exact", head: true })
+          .eq("category_id", pajamasCat.id);
+        pajamasCount = count ?? 0;
+      }
+
+      setCategoryCounts({ daster: dasterCount, pajamas: pajamasCount });
+    })();
   }, []);
 
   const featured = dbProducts && dbProducts.length > 0
     ? dbProducts.map((p, i) => ({
-      slug: p.slug,
-      name: p.name,
-      price: Number(p.price),
-      image: resolveProductImage(p.image_url, i % 2 === 0 ? "daster" : "pajamas"),
-    }))
-    : fallbackFeatured.map(p => ({ slug: p.slug, name: p.name, price: p.price, image: p.image }));
+        slug: p.slug,
+        name: p.name,
+        price: Number(p.price),
+        original_price: p.original_price ? Number(p.original_price) : undefined,
+        image: resolveProductImage(p.image_url, i % 2 === 0 ? "daster" : "pajamas"),
+        status: (p.status as any) || "ready",
+        stock: p.stock,
+      }))
+    : fallbackFeatured.map(p => ({
+        slug: p.slug,
+        name: p.name,
+        price: p.price,
+        original_price: p.originalPrice,
+        image: p.image,
+        status: (p.status as any) || "ready",
+        stock: p.stock ?? 10,
+      }));
+
   return (
     <>
       {/* Hero — full bleed, header overlays this */}
@@ -52,22 +106,19 @@ export default function Index() {
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 md:gap-6">
             {featured.map(product => (
-              <Link
+              <ProductCard
                 key={product.slug}
-                to={`/product/${product.slug}`}
-                className="group block"
-              >
-                <div className="bg-[hsl(var(--warm-bg))] aspect-[4/5] overflow-hidden mb-3 md:mb-4">
-                  <img
-                    src={product.image}
-                    alt={product.name}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    loading="lazy"
-                  />
-                </div>
-                <h3 className="text-sm md:text-base font-light text-foreground mb-1 truncate">{product.name}</h3>
-                <p className="text-sm text-muted-foreground">{formatIDR(product.price)}</p>
-              </Link>
+                product={{
+                  slug: product.slug,
+                  name: product.name,
+                  price: product.price,
+                  original_price: product.original_price,
+                  image: product.image,
+                  description: "",
+                  status: product.status,
+                  stock: product.stock,
+                }}
+              />
             ))}
           </div>
         </div>
@@ -76,24 +127,47 @@ export default function Index() {
       {/* Collections — tight gap, polished overlays */}
       <section className="max-w-7xl mx-auto px-6 py-12">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          {/* The Sleep Dress (Daster) */}
           <Link to="/collections/sleep-dress" className="relative overflow-hidden group block">
             <img
               src={coreCollection}
               alt="The Core Collection"
               className="w-full aspect-[4/5] object-cover transition-transform duration-700 group-hover:scale-[1.03]"
             />
-            <div className="absolute inset-0 bg-black/20 group-hover:bg-black/30 transition-colors duration-500 flex flex-col justify-between p-8">
+
+            {/* COMING SOON Overlay when 0 products in category */}
+            {categoryCounts.daster === 0 && (
+              <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-[1px] flex items-center justify-center z-10">
+                <span className="text-white/95 font-extrabold text-xl md:text-3xl tracking-[0.25em] uppercase border-2 border-white/80 px-6 py-2 rotate-[-8deg] shadow-2xl bg-black/40 select-none">
+                  COMING SOON
+                </span>
+              </div>
+            )}
+
+            <div className="absolute inset-0 bg-black/20 group-hover:bg-black/30 transition-colors duration-500 flex flex-col justify-between p-8 z-20">
               <span className="text-sm uppercase tracking-widest text-white/80">Explore</span>
               <h3 className="text-2xl md:text-3xl font-light text-white">The Sleep Dress</h3>
             </div>
           </Link>
+
+          {/* The Lounge Sets (Pajamas) */}
           <Link to="/collections/lounge-sets" className="relative overflow-hidden group block">
             <img
               src={setsAndPairs}
               alt="Sets and Pairs"
               className="w-full aspect-[4/5] object-cover transition-transform duration-700 group-hover:scale-[1.03]"
             />
-            <div className="absolute inset-0 bg-black/20 group-hover:bg-black/30 transition-colors duration-500 flex flex-col justify-between p-8">
+
+            {/* COMING SOON Overlay when 0 products in category */}
+            {categoryCounts.pajamas === 0 && (
+              <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-[1px] flex items-center justify-center z-10">
+                <span className="text-white/95 font-extrabold text-xl md:text-3xl tracking-[0.25em] uppercase border-2 border-white/80 px-6 py-2 rotate-[-8deg] shadow-2xl bg-black/40 select-none">
+                  COMING SOON
+                </span>
+              </div>
+            )}
+
+            <div className="absolute inset-0 bg-black/20 group-hover:bg-black/30 transition-colors duration-500 flex flex-col justify-between p-8 z-20">
               <span className="text-sm uppercase tracking-widest text-white/80">Start Fresh</span>
               <h3 className="text-2xl md:text-3xl font-light text-white">The Lounge Sets</h3>
             </div>

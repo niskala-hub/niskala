@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { formatIDR } from "@/lib/currency";
 import { resolveProductImage } from "@/lib/productImage";
+import ProductCard from "@/components/ProductCard";
+import ComingSoon from "@/components/ComingSoon";
 import coreCollectionImg from "@/assets/collections/core-collection.jpg";
 
 interface DBProduct {
@@ -10,6 +10,8 @@ interface DBProduct {
   slug: string;
   name: string;
   price: number;
+  original_price: number | null;
+  status: string | null;
   stock: number;
   image_url: string | null;
 }
@@ -32,13 +34,17 @@ export default function SleepDress() {
       }
       const { data } = await supabase
         .from("products")
-        .select("id,slug,name,price,stock,image_url")
+        .select("id,slug,name,price,original_price,status,stock,image_url")
         .eq("category_id", cat.id)
         .order("created_at", { ascending: false });
       setProducts(data || []);
       setLoading(false);
     })();
   }, []);
+
+  if (!loading && products.length === 0) {
+    return <ComingSoon title="The Sleep Dress" description="Koleksi The Sleep Dress (Daster) belum memiliki produk saat ini dan akan segera hadir. Tetap nantikan rilis produk terbaru dari NISKALA!" />;
+  }
 
   return (
     <>
@@ -74,26 +80,21 @@ export default function SleepDress() {
           <p className="text-center text-muted-foreground">No products in this collection yet.</p>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6 lg:gap-8">
-            {products.map((p) => {
-              const soldOut = p.stock <= 0;
-              return (
-                <Link key={p.id} to={`/product/${p.slug}`} className="group block">
-                  <div className="overflow-hidden bg-[hsl(var(--warm-bg))]">
-                    <img
-                      src={resolveProductImage(p.image_url, "daster")}
-                      alt={p.name}
-                      className="w-full aspect-[4/5] object-cover object-center transition-transform duration-500 group-hover:scale-105"
-                      loading="lazy"
-                    />
-                  </div>
-                  <div className="mt-3 md:mt-4 flex items-baseline justify-between gap-1 md:gap-2">
-                    <h3 className="text-sm md:text-base font-medium text-foreground truncate">{p.name}</h3>
-                    {soldOut && <span className="text-[10px] md:text-xs text-accent font-medium shrink-0">Sold out</span>}
-                  </div>
-                  <p className="text-sm text-foreground mt-1">{formatIDR(Number(p.price))}</p>
-                </Link>
-              );
-            })}
+            {products.map((p) => (
+              <ProductCard
+                key={p.id}
+                product={{
+                  slug: p.slug,
+                  name: p.name,
+                  price: Number(p.price),
+                  original_price: p.original_price ? Number(p.original_price) : undefined,
+                  image: resolveProductImage(p.image_url, "daster"),
+                  description: "",
+                  status: (p.status as any) || "ready",
+                  stock: p.stock,
+                }}
+              />
+            ))}
           </div>
         )}
       </section>

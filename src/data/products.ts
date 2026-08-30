@@ -13,10 +13,13 @@ export interface Product {
   name: string;
   price: number;
   originalPrice?: number;
+  original_price?: number;
   image: string;
   description: string;
   badge?: "sale" | "sold-out";
   availability?: string;
+  status?: "ready" | "coming_soon" | "sold";
+  stock?: number;
 }
 
 export const products: Product[] = [

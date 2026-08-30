@@ -4,13 +4,15 @@ import { useToast } from "@/hooks/use-toast";
 import { Pencil, Trash2, Plus, X, Upload } from "lucide-react";
 import { formatIDR } from "@/lib/currency";
 import { resolveProductImage } from "@/lib/productImage";
+import { getProductStatusInfo } from "@/lib/product";
 import ProductVariants from "@/components/admin/ProductVariants";
 import ProductSizes from "@/components/admin/ProductSizes";
 
 interface Category { id: string; name: string; }
 interface Product {
   id: string; name: string; slug: string; description: string | null;
-  price: number; hpp_price: number; stock: number; image_url: string | null;
+  price: number; original_price: number | null; hpp_price: number; stock: number;
+  status: string | null; image_url: string | null;
   image_urls: string[] | null; category_id: string | null;
 }
 
@@ -23,8 +25,8 @@ export default function Products() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState({
-    name: "", slug: "", description: "", price: 0, hpp_price: 0, stock: 0,
-    category_id: "", image_urls: [] as string[],
+    name: "", slug: "", description: "", price: 0, original_price: 0, hpp_price: 0, stock: 0,
+    status: "ready", category_id: "", image_urls: [] as string[],
   });
   const [uploading, setUploading] = useState(false);
   const { toast } = useToast();
@@ -43,7 +45,10 @@ export default function Products() {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ name: "", slug: "", description: "", price: 0, hpp_price: 0, stock: 0, category_id: "", image_urls: [] });
+    setForm({
+      name: "", slug: "", description: "", price: 0, original_price: 0, hpp_price: 0, stock: 0,
+      status: "ready", category_id: "", image_urls: []
+    });
     setOpen(true);
   };
 
@@ -52,7 +57,8 @@ export default function Products() {
     const imgs = (p.image_urls && p.image_urls.length > 0) ? p.image_urls : (p.image_url ? [p.image_url] : []);
     setForm({
       name: p.name, slug: p.slug, description: p.description || "",
-      price: Number(p.price), hpp_price: Number(p.hpp_price), stock: p.stock,
+      price: Number(p.price), original_price: p.original_price ? Number(p.original_price) : 0,
+      hpp_price: Number(p.hpp_price), stock: p.stock, status: p.status || "ready",
       category_id: p.category_id || "", image_urls: imgs.slice(0, MAX_IMAGES),
     });
     setOpen(true);
@@ -101,8 +107,10 @@ export default function Products() {
       slug: form.slug || slugify(form.name),
       description: form.description || null,
       price: form.price,
+      original_price: form.original_price > 0 ? form.original_price : null,
       hpp_price: form.hpp_price,
       stock: form.stock,
+      status: form.status,
       category_id: form.category_id || null,
       image_url: imgs[0] || null,
       image_urls: imgs,
@@ -140,30 +148,54 @@ export default function Products() {
           <h1 className="text-2xl md:text-3xl font-light">Products</h1>
           <p className="text-sm text-muted-foreground mt-1">{rows.length} total</p>
         </div>
-        <button onClick={openNew} className="flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground text-sm">
+        <button onClick={openNew} className="flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground text-sm font-medium">
           <Plus className="w-4 h-4" /> New product
         </button>
       </div>
 
       {/* Mobile cards */}
       <div className="md:hidden space-y-3">
-        {rows.map(p => (
-          <div key={p.id} className="border border-border p-3 flex gap-3">
-            <img src={resolveProductImage(p.image_url)} alt={p.name} className="w-16 h-16 object-cover shrink-0" />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm truncate">{p.name}</p>
-              <p className="text-xs text-muted-foreground truncate">{p.slug} · {imageCount(p)} img</p>
-              <p className="text-sm mt-1">{formatIDR(Number(p.price))}</p>
-              <p className="text-xs text-muted-foreground">
-                HPP {formatIDR(Number(p.hpp_price))} · Stok {p.stock}
-              </p>
+        {rows.map(p => {
+          const st = getProductStatusInfo(p);
+          return (
+            <div key={p.id} className="border border-border p-3 flex gap-3">
+              <div className="relative w-16 h-16 shrink-0">
+                <img src={resolveProductImage(p.image_url)} alt={p.name} className="w-16 h-16 object-cover" />
+                {st.isSold && (
+                  <div className="absolute inset-0 bg-slate-900/60 flex items-center justify-center text-[9px] font-bold text-white uppercase">
+                    Sold
+                  </div>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium truncate">{p.name}</p>
+                  <span className={`text-[10px] px-1.5 py-0.5 font-medium rounded ${
+                    st.isComingSoon ? "bg-amber-100 text-amber-800" :
+                    st.isSold ? "bg-slate-200 text-slate-700" :
+                    "bg-emerald-100 text-emerald-800"
+                  }`}>
+                    {st.label}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground truncate">{p.slug} · {imageCount(p)} img</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-sm font-semibold">{formatIDR(Number(p.price))}</span>
+                  {p.original_price && Number(p.original_price) > Number(p.price) && (
+                    <span className="text-xs text-muted-foreground line-through">{formatIDR(Number(p.original_price))}</span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  HPP {formatIDR(Number(p.hpp_price))} · Stok {p.stock}
+                </p>
+              </div>
+              <div className="flex flex-col gap-1">
+                <button onClick={() => openEdit(p)} className="p-2 hover:bg-muted"><Pencil className="w-4 h-4" /></button>
+                <button onClick={() => remove(p.id)} className="p-2 hover:bg-muted text-destructive"><Trash2 className="w-4 h-4" /></button>
+              </div>
             </div>
-            <div className="flex flex-col gap-1">
-              <button onClick={() => openEdit(p)} className="p-2 hover:bg-muted"><Pencil className="w-4 h-4" /></button>
-              <button onClick={() => remove(p.id)} className="p-2 hover:bg-muted text-destructive"><Trash2 className="w-4 h-4" /></button>
-            </div>
-          </div>
-        ))}
+          );
+        })}
         {rows.length === 0 && (
           <p className="border border-border py-10 text-center text-sm text-muted-foreground">No products yet.</p>
         )}
@@ -171,47 +203,71 @@ export default function Products() {
 
       {/* Desktop table */}
       <div className="hidden md:block border border-border overflow-x-auto">
-        <table className="w-full text-sm min-w-[720px]">
+        <table className="w-full text-sm min-w-[760px]">
           <thead className="bg-muted text-left">
             <tr>
               <th className="px-4 py-3 font-medium w-20">Image</th>
               <th className="px-4 py-3 font-medium">Name</th>
-              <th className="px-4 py-3 font-medium">Price</th>
+              <th className="px-4 py-3 font-medium">Status</th>
+              <th className="px-4 py-3 font-medium">Price (Diskon)</th>
+              <th className="px-4 py-3 font-medium">Harga Asli</th>
               <th className="px-4 py-3 font-medium">HPP</th>
-              <th className="px-4 py-3 font-medium">Margin</th>
               <th className="px-4 py-3 font-medium">Stock</th>
               <th className="px-4 py-3 font-medium w-32">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map(p => (
-              <tr key={p.id} className="border-t border-border">
-                <td className="px-4 py-3">
-                  <div className="relative w-12 h-12">
-                    <img src={resolveProductImage(p.image_url)} alt={p.name} className="w-12 h-12 object-cover" />
-                    {imageCount(p) > 1 && (
-                      <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-[10px] px-1">
-                        {imageCount(p)}
-                      </span>
+            {rows.map(p => {
+              const st = getProductStatusInfo(p);
+              return (
+                <tr key={p.id} className="border-t border-border">
+                  <td className="px-4 py-3">
+                    <div className="relative w-12 h-12">
+                      <img src={resolveProductImage(p.image_url)} alt={p.name} className="w-12 h-12 object-cover" />
+                      {st.isSold && (
+                        <div className="absolute inset-0 bg-slate-900/60 flex items-center justify-center text-[8px] font-bold text-white uppercase">
+                          Sold
+                        </div>
+                      )}
+                      {imageCount(p) > 1 && (
+                        <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-[10px] px-1">
+                          {imageCount(p)}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="font-medium">{p.name}</div>
+                    <div className="text-xs text-muted-foreground">{p.slug}</div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-block text-xs px-2 py-0.5 font-medium rounded ${
+                      st.isComingSoon ? "bg-amber-100 text-amber-800" :
+                      st.isSold ? "bg-slate-200 text-slate-700" :
+                      "bg-emerald-100 text-emerald-800"
+                    }`}>
+                      {st.label}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 font-semibold">{formatIDR(Number(p.price))}</td>
+                  <td className="px-4 py-3 text-muted-foreground">
+                    {p.original_price && Number(p.original_price) > 0 ? (
+                      <span className="line-through">{formatIDR(Number(p.original_price))}</span>
+                    ) : (
+                      "-"
                     )}
-                  </div>
-                </td>
-                <td className="px-4 py-3">
-                  <div>{p.name}</div>
-                  <div className="text-xs text-muted-foreground">{p.slug}</div>
-                </td>
-                <td className="px-4 py-3">{formatIDR(Number(p.price))}</td>
-                <td className="px-4 py-3 text-muted-foreground">{formatIDR(Number(p.hpp_price))}</td>
-                <td className="px-4 py-3 text-muted-foreground">{formatIDR(Number(p.price) - Number(p.hpp_price))}</td>
-                <td className="px-4 py-3">{p.stock}</td>
-                <td className="px-4 py-3 flex gap-2">
-                  <button onClick={() => openEdit(p)} className="p-2 hover:bg-muted"><Pencil className="w-4 h-4" /></button>
-                  <button onClick={() => remove(p.id)} className="p-2 hover:bg-muted text-destructive"><Trash2 className="w-4 h-4" /></button>
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">{formatIDR(Number(p.hpp_price))}</td>
+                  <td className="px-4 py-3">{p.stock}</td>
+                  <td className="px-4 py-3 flex gap-2">
+                    <button onClick={() => openEdit(p)} className="p-2 hover:bg-muted"><Pencil className="w-4 h-4" /></button>
+                    <button onClick={() => remove(p.id)} className="p-2 hover:bg-muted text-destructive"><Trash2 className="w-4 h-4" /></button>
+                  </td>
+                </tr>
+              );
+            })}
             {rows.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">No products yet.</td></tr>
+              <tr><td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">No products yet.</td></tr>
             )}
           </tbody>
         </table>
@@ -353,16 +409,36 @@ export default function Products() {
                   </div>
                 </div>
 
-                {/* RIGHT COLUMN: Pricing, Stock, and Variants */}
+                {/* RIGHT COLUMN: Pricing, Status, Stock, and Variants */}
                 <div className="space-y-4">
                   <div className="bg-muted/30 border border-border p-4 space-y-4">
                     <p className="text-xs uppercase tracking-wider font-medium text-foreground">
-                      Harga &amp; Stok Base
+                      Harga, Status &amp; Stok
                     </p>
+
+                    {/* Status Picker */}
+                    <div>
+                      <label className="block text-xs uppercase tracking-wider font-medium text-muted-foreground mb-1">
+                        Status Produk
+                      </label>
+                      <select
+                        value={form.status}
+                        onChange={e => setForm(f => ({ ...f, status: e.target.value }))}
+                        className="w-full px-3 py-2 border border-border bg-background text-sm focus:outline-none focus:border-primary font-medium"
+                      >
+                        <option value="ready">Ready (Otomatis Sold jika Stok 0)</option>
+                        <option value="coming_soon">Coming Soon (Manual - Tombol Pesan Nonaktif)</option>
+                        <option value="sold">Sold Out (Habis)</option>
+                      </select>
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        * Jika memilih "Coming Soon", gambar produk tetap muncul namun tombol pesan di detail akan tidak dapat dipencet.
+                      </p>
+                    </div>
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs uppercase tracking-wider font-medium text-muted-foreground mb-1">
-                          Price (IDR)
+                          Harga Jual / Diskon (Rp)
                         </label>
                         <div className="relative">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium select-none">
@@ -378,7 +454,7 @@ export default function Products() {
                               setForm(f => ({ ...f, price: raw ? parseInt(raw, 10) : 0 }));
                             }}
                             placeholder="0"
-                            className="w-full pl-9 pr-3 py-2 border border-border bg-background text-sm focus:outline-none focus:border-primary"
+                            className="w-full pl-9 pr-3 py-2 border border-border bg-background text-sm font-semibold focus:outline-none focus:border-primary"
                           />
                         </div>
                         {form.price > 0 && (
@@ -388,7 +464,38 @@ export default function Products() {
 
                       <div>
                         <label className="block text-xs uppercase tracking-wider font-medium text-muted-foreground mb-1">
-                          HPP / Modal
+                          Harga Asli / Normal (Rp)
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium select-none">
+                            Rp
+                          </span>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={form.original_price ? form.original_price.toLocaleString("id-ID") : ""}
+                            onChange={e => {
+                              const raw = e.target.value.replace(/\D/g, "");
+                              setForm(f => ({ ...f, original_price: raw ? parseInt(raw, 10) : 0 }));
+                            }}
+                            placeholder="Opsional (misal: 400.000)"
+                            className="w-full pl-9 pr-3 py-2 border border-border bg-background text-sm focus:outline-none focus:border-primary"
+                          />
+                        </div>
+                        {form.original_price > 0 ? (
+                          <p className="text-[11px] text-muted-foreground mt-1 font-mono line-through">
+                            {formatIDR(form.original_price)}
+                          </p>
+                        ) : (
+                          <p className="text-[11px] text-muted-foreground mt-1">Muncul dicoret di UI jika diisi</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs uppercase tracking-wider font-medium text-muted-foreground mb-1">
+                          HPP / Modal (Rp)
                         </label>
                         <div className="relative">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium select-none">
@@ -411,20 +518,20 @@ export default function Products() {
                           <p className="text-[11px] text-muted-foreground mt-1 font-mono">{formatIDR(form.hpp_price)}</p>
                         )}
                       </div>
-                    </div>
 
-                    <div>
-                      <label className="block text-xs uppercase tracking-wider font-medium text-muted-foreground mb-1">
-                        Stock Total
-                      </label>
-                      <input
-                        type="number"
-                        min={0}
-                        required
-                        value={form.stock}
-                        onChange={e => setForm(f => ({ ...f, stock: Number(e.target.value) }))}
-                        className="w-full px-3 py-2 border border-border bg-background text-sm focus:outline-none focus:border-primary"
-                      />
+                      <div>
+                        <label className="block text-xs uppercase tracking-wider font-medium text-muted-foreground mb-1">
+                          Stock Total
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          required
+                          value={form.stock}
+                          onChange={e => setForm(f => ({ ...f, stock: Number(e.target.value) }))}
+                          className="w-full px-3 py-2 border border-border bg-background text-sm focus:outline-none focus:border-primary"
+                        />
+                      </div>
                     </div>
                   </div>
 

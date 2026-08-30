@@ -5,12 +5,13 @@ import { LayoutDashboard, Package, Tags, LogOut, Store, Link2, Wallet, Users, Me
 import { cn } from "@/lib/utils";
 
 export default function AdminLayout() {
-  const { session, isAdmin, isOwner, loading, signOut } = useAuth();
+  const { session, isAdmin, isOwner, isCoOwner, canManageUsers, mustChangePassword, loading, signOut } = useAuth();
   const [open, setOpen] = useState(false);
   const location = useLocation();
 
   if (loading) return <div className="p-12 text-sm text-muted-foreground">Loading…</div>;
   if (!session) return <Navigate to="/auth" replace />;
+  if (mustChangePassword) return <Navigate to="/auth/change-password" replace />;
   if (!isAdmin) {
     return (
       <div className="max-w-md mx-auto px-6 py-24 text-center">
@@ -31,7 +32,7 @@ export default function AdminLayout() {
     <>
       <div className="px-6 py-6 border-b border-border">
         <Link to="/" className="text-xl font-light tracking-widest">NISKALA</Link>
-        <p className="text-xs text-muted-foreground mt-1">{isOwner ? "Owner" : "Admin"}</p>
+        <p className="text-xs text-muted-foreground mt-1">{isOwner ? "Owner" : isCoOwner ? "Co-Owner" : "Admin"}</p>
       </div>
       <nav className="flex-1 py-4 overflow-y-auto" onClick={close}>
         <NavLink to="/admin" end className={cls}>
@@ -49,7 +50,7 @@ export default function AdminLayout() {
         <NavLink to="/admin/accounting" className={cls}>
           <Wallet className="w-4 h-4" /> Accounting
         </NavLink>
-        {isOwner && (
+        {canManageUsers && (
           <NavLink to="/admin/users" className={cls}>
             <Users className="w-4 h-4" /> Users
           </NavLink>

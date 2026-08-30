@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { formatIDR } from "@/lib/currency";
 import { resolveProductImage } from "@/lib/productImage";
+import { getProductStatusInfo } from "@/lib/product";
 import { Check, ZoomIn, X, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface DBProduct {
@@ -11,6 +12,8 @@ interface DBProduct {
   slug: string;
   name: string;
   price: number;
+  original_price: number | null;
+  status: string | null;
   stock: number;
   description: string | null;
   image_url: string | null;
@@ -79,7 +82,7 @@ export default function ProductDetail() {
     (async () => {
       const { data } = await supabase
         .from("products")
-        .select("id,slug,name,price,stock,description,image_url,image_urls")
+        .select("id,slug,name,price,original_price,status,stock,description,image_url,image_urls")
         .eq("slug", slug)
         .maybeSingle();
       if (cancelled) return;
@@ -95,7 +98,7 @@ export default function ProductDetail() {
           .order("sort_order"),
         supabase
           .from("products")
-          .select("id,slug,name,price,stock,description,image_url,image_urls")
+          .select("id,slug,name,price,original_price,status,stock,description,image_url,image_urls")
           .neq("slug", slug)
           .gt("stock", 0)
           .limit(3),
@@ -143,8 +146,14 @@ export default function ProductDetail() {
   const hasVariants = models.length > 0;
   const needsChoice =
     (hasVariants && (!modelId || (motifs.length > 0 && !motifId))) || (sizes.length > 0 && !sizeId);
-  const isSoldOut =
-    product.stock <= 0 || (selectedMotif ? selectedMotif.stock <= 0 : false);
+
+  const statusInfo = getProductStatusInfo({
+    status: product.status,
+    stock: product.stock,
+  });
+
+  const isSoldOut = statusInfo.isSold || (selectedMotif ? selectedMotif.stock <= 0 : false);
+  const isComingSoon = statusInfo.isComingSoon;
 
   const productUrl =
     typeof window !== "undefined" ? `${window.location.origin}/product/${product.slug}` : "";
@@ -189,7 +198,24 @@ export default function ProductDetail() {
                 alt={`${product.name}${selectedMotif ? ` – motif ${selectedMotif.name}` : ""}`}
                 className="w-full h-full object-cover object-center animate-[fadeIn_0.3s_ease] transition-transform duration-500 group-hover:scale-[1.03]"
               />
-              <span className="absolute bottom-3 right-3 flex items-center gap-1 bg-background/85 text-foreground text-[11px] px-2 py-1">
+
+              {/* Watermark overlay when SOLD OUT */}
+              {isSoldOut && (
+                <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-[1px] flex items-center justify-center pointer-events-none z-10">
+                  <span className="text-white/95 font-bold text-lg md:text-2xl tracking-[0.25em] uppercase border-2 border-white/80 px-5 py-2 rotate-[-10deg] shadow-2xl bg-black/40 select-none">
+                    SOLD OUT
+                  </span>
+                </div>
+              )}
+
+              {/* Coming Soon overlay tag */}
+              {isComingSoon && !isSoldOut && (
+                <span className="absolute top-3 left-3 bg-amber-600/90 text-white font-medium text-xs px-2.5 py-1 tracking-wider uppercase shadow">
+                  Coming Soon
+                </span>
+              )}
+
+              <span className="absolute bottom-3 right-3 flex items-center gap-1 bg-background/85 text-foreground text-[11px] px-2 py-1 z-20">
                 <ZoomIn className="w-3.5 h-3.5" /> Zoom
               </span>
             </button>
@@ -222,10 +248,20 @@ export default function ProductDetail() {
             <h1 className="text-xl md:text-2xl lg:text-3xl font-bold uppercase tracking-wide text-foreground mb-3 md:mb-4">
               {product.name}
             </h1>
-            <p className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4 md:mb-6">
-              {formatIDR(Number(product.price))}
-            </p>
-            {!isSoldOut && product.stock > 0 && product.stock <= 5 && !selectedMotif && (
+
+            {/* Price section: Discount price (normal) & Original price (strikethrough) */}
+            <div className="flex items-baseline gap-3 mb-4 md:mb-6">
+              <span className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground">
+                {formatIDR(Number(product.price))}
+              </span>
+              {product.original_price && Number(product.original_price) > Number(product.price) && (
+                <span className="text-xl md:text-2xl text-muted-foreground/60 line-through font-normal">
+                  {formatIDR(Number(product.original_price))}
+                </span>
+              )}
+            </div>
+
+            {!isSoldOut && !isComingSoon && product.stock > 0 && product.stock <= 5 && !selectedMotif && (
               <p className="text-sm text-accent font-medium mb-4">Hanya {product.stock} tersedia</p>
             )}
             {product.description && (
@@ -336,11 +372,15 @@ export default function ProductDetail() {
             )}
 
             {isSoldOut ? (
-              <button disabled className="w-full py-3 bg-muted text-muted-foreground text-sm font-medium cursor-not-allowed">
+              <button disabled className="w-full py-3.5 bg-muted text-muted-foreground text-sm font-medium cursor-not-allowed border border-border">
                 Sold Out
               </button>
+            ) : isComingSoon ? (
+              <button disabled className="w-full py-3.5 bg-muted text-muted-foreground/80 text-sm font-medium cursor-not-allowed border border-border opacity-70">
+                Coming Soon
+              </button>
             ) : needsChoice ? (
-              <button disabled className="w-full py-3 bg-muted text-muted-foreground text-sm font-medium cursor-not-allowed">
+              <button disabled className="w-full py-3.5 bg-muted text-muted-foreground text-sm font-medium cursor-not-allowed">
                 Pilih size, model & motif terlebih dahulu
               </button>
             ) : (
@@ -348,7 +388,7 @@ export default function ProductDetail() {
                 href={`https://wa.me/?text=${encodeURIComponent(waText)}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full py-3 bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity text-center"
+                className="w-full py-3.5 bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity text-center block"
               >
                 Order Via WhatsApp
               </a>

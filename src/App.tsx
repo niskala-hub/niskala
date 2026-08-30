@@ -24,6 +24,7 @@ import AdminUsers from "./pages/admin/Users";
 import AdminAccounting from "./pages/admin/Accounting";
 import LinkBio from "./pages/LinkBio";
 import NotFound from "./pages/NotFound";
+import ChangePassword from "./pages/ChangePassword";
 
 const queryClient = new QueryClient();
 
@@ -47,6 +48,7 @@ const App = () => (
                 <Route path="/collections/lounge-sets" element={<LoungeSets />} />
               </Route>
               <Route path="/auth" element={<Auth />} />
+              <Route path="/auth/change-password" element={<ChangePassword />} />
               <Route path="/links" element={<LinkBio />} />
               <Route path="/admin" element={<AdminLayout />}>
                 <Route index element={<Dashboard />} />

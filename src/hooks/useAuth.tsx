@@ -8,8 +8,12 @@ interface AuthCtx {
   roles: string[];
   isAdmin: boolean;
   isOwner: boolean;
+  isCoOwner: boolean;
+  canManageUsers: boolean;
+  mustChangePassword: boolean;
   loading: boolean;
   signOut: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
 }
 
 const Ctx = createContext<AuthCtx | undefined>(undefined);
@@ -17,29 +21,50 @@ const Ctx = createContext<AuthCtx | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [roles, setRoles] = useState<string[]>([]);
+  const [mustChangePassword, setMustChangePassword] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const fetchRoles = (userId: string) => {
-    supabase
+  const fetchRoles = async (userId: string) => {
+    const { data } = await supabase
       .from("user_roles")
       .select("role")
-      .eq("user_id", userId)
-      .then(({ data }) => setRoles((data || []).map(r => r.role as string)));
+      .eq("user_id", userId);
+    setRoles((data || []).map(r => r.role as string));
+  };
+
+  const fetchProfile = async (userId: string) => {
+    const { data } = await supabase
+      .from("profiles")
+      .select("must_change_password")
+      .eq("id", userId)
+      .maybeSingle();
+    setMustChangePassword(data?.must_change_password ?? false);
+  };
+
+  const refreshProfile = async () => {
+    if (session?.user) await fetchProfile(session.user.id);
   };
 
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
       setSession(s);
       if (s?.user) {
-        setTimeout(() => fetchRoles(s.user.id), 0);
+        setTimeout(() => {
+          fetchRoles(s.user.id);
+          fetchProfile(s.user.id);
+        }, 0);
       } else {
         setRoles([]);
+        setMustChangePassword(false);
       }
     });
 
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
-      if (data.session?.user) fetchRoles(data.session.user.id);
+      if (data.session?.user) {
+        fetchRoles(data.session.user.id);
+        fetchProfile(data.session.user.id);
+      }
       setLoading(false);
     });
 
@@ -51,10 +76,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const isOwner = roles.includes("owner");
-  const isAdmin = isOwner || roles.includes("admin");
+  const isCoOwner = roles.includes("co_owner");
+  const isAdmin = isOwner || isCoOwner || roles.includes("admin");
+  const canManageUsers = isOwner || isCoOwner;
 
   return (
-    <Ctx.Provider value={{ session, user: session?.user ?? null, roles, isAdmin, isOwner, loading, signOut }}>
+    <Ctx.Provider value={{
+      session,
+      user: session?.user ?? null,
+      roles,
+      isAdmin,
+      isOwner,
+      isCoOwner,
+      canManageUsers,
+      mustChangePassword,
+      loading,
+      signOut,
+      refreshProfile,
+    }}>
       {children}
     </Ctx.Provider>
   );
