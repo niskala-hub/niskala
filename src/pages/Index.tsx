@@ -57,7 +57,7 @@ export default function Index() {
                 to={`/product/${product.slug}`}
                 className="group block"
               >
-                <div className="bg-[hsl(var(--warm-bg))] aspect-square overflow-hidden mb-3 md:mb-4">
+                <div className="bg-[hsl(var(--warm-bg))] aspect-[4/5] overflow-hidden mb-3 md:mb-4">
                   <img
                     src={product.image}
                     alt={product.name}

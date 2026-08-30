@@ -302,7 +302,7 @@ export default function ProductDetail() {
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-8">
             {related.map((p, i) => (
               <Link key={p.id} to={`/product/${p.slug}`} className="group block">
-                <div className="bg-[hsl(var(--warm-bg))] aspect-square overflow-hidden mb-3 md:mb-4">
+                <div className="bg-[hsl(var(--warm-bg))] aspect-[4/5] overflow-hidden mb-3 md:mb-4">
                   <img
                     src={resolveProductImage(p.image_url, i % 2 === 0 ? "daster" : "pajamas")}
                     alt={p.name}
