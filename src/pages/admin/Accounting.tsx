@@ -636,18 +636,26 @@ export default function Accounting() {
               </button>
             </div>
             <div>
-              <Label htmlFor="amount">Nominal (Rp)</Label>
-              <Input
-                id="amount"
-                type="number"
-                min={0}
-                inputMode="numeric"
-                placeholder="contoh: 500000"
-                value={draft.amount}
-                onChange={(e) => setDraft({ ...draft, amount: e.target.value })}
-              />
+              <Label htmlFor="amount">Nominal</Label>
+              <div className="relative mt-1">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium select-none">
+                  Rp
+                </span>
+                <Input
+                  id="amount"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="0"
+                  className="pl-9"
+                  value={draft.amount ? Number(draft.amount).toLocaleString("id-ID") : ""}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/\D/g, "");
+                    setDraft({ ...draft, amount: raw });
+                  }}
+                />
+              </div>
               {Number(draft.amount) > 0 && (
-                <p className="text-xs text-muted-foreground mt-1">{formatIDR(Number(draft.amount))}</p>
+                <p className="text-xs text-muted-foreground mt-1 font-mono">{formatIDR(Number(draft.amount))}</p>
               )}
             </div>
             <div>

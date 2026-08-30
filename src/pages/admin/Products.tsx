@@ -218,102 +218,250 @@ export default function Products() {
       </div>
 
       {open && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-start sm:items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-background w-full max-w-lg p-4 sm:p-6 relative my-4 sm:my-8">
-            <button onClick={() => setOpen(false)} className="absolute top-4 right-4"><X className="w-4 h-4" /></button>
-            <h2 className="text-lg sm:text-xl font-light mb-5">{editing ? "Edit" : "New"} product</h2>
-            <form onSubmit={save} className="space-y-4">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+          <div className="bg-background w-full max-w-5xl rounded-none border border-border shadow-2xl relative my-auto max-h-[90vh] flex flex-col overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-border bg-background shrink-0">
               <div>
-                <label className="text-xs uppercase tracking-wider text-muted-foreground">
-                  Images ({form.image_urls.length}/{MAX_IMAGES})
-                </label>
-                <div className="mt-2 grid grid-cols-3 sm:grid-cols-5 gap-2">
-                  {form.image_urls.map((url, i) => (
-                    <div key={url} className="relative aspect-square border border-border">
-                      <img src={url} alt="" className="w-full h-full object-cover" />
-                      <button type="button" onClick={() => removeImage(url)}
-                        className="absolute top-0 right-0 bg-background/90 p-1" aria-label="Hapus gambar">
-                        <X className="w-3 h-3" />
-                      </button>
-                      {i === 0 ? (
-                        <span className="absolute bottom-0 left-0 right-0 bg-primary text-primary-foreground text-[10px] text-center">Utama</span>
-                      ) : (
-                        <button type="button" onClick={() => makePrimary(url)}
-                          className="absolute bottom-0 left-0 right-0 bg-background/90 text-[10px]">Jadikan utama</button>
+                <h2 className="text-lg sm:text-xl font-light text-foreground">
+                  {editing ? "Edit Product" : "New Product"}
+                </h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {editing ? `Mengedit info & varian untuk ${editing.name}` : "Tambahkan produk baru ke katalog NISKALA"}
+                </p>
+              </div>
+              <button
+                onClick={() => setOpen(false)}
+                className="p-2 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Tutup modal"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Scrollable Form Body - 2 Columns on Desktop */}
+            <form onSubmit={save} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                
+                {/* LEFT COLUMN: Media & Basic Info */}
+                <div className="space-y-4">
+                  <div className="bg-muted/30 border border-border p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs uppercase tracking-wider font-medium text-foreground">
+                        Product Images ({form.image_urls.length}/{MAX_IMAGES})
+                      </label>
+                      <span className="text-[11px] text-muted-foreground">Format JPG/PNG</span>
+                    </div>
+
+                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                      {form.image_urls.map((url, i) => (
+                        <div key={url} className="relative aspect-square border border-border bg-background group overflow-hidden">
+                          <img src={url} alt="" className="w-full h-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => removeImage(url)}
+                            className="absolute top-1 right-1 bg-background/90 text-destructive p-1 shadow hover:bg-destructive hover:text-destructive-foreground transition-colors"
+                            aria-label="Hapus gambar"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                          {i === 0 ? (
+                            <span className="absolute bottom-0 left-0 right-0 bg-primary text-primary-foreground text-[10px] py-0.5 text-center font-medium">
+                              Utama
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => makePrimary(url)}
+                              className="absolute bottom-0 left-0 right-0 bg-background/95 text-[10px] py-0.5 text-foreground hover:bg-primary hover:text-primary-foreground transition-colors opacity-90 group-hover:opacity-100"
+                            >
+                              Set Utama
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      {form.image_urls.length < MAX_IMAGES && (
+                        <label className="aspect-square border border-dashed border-border flex flex-col items-center justify-center gap-1 cursor-pointer text-xs text-muted-foreground hover:bg-muted hover:border-primary transition-colors">
+                          <Upload className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-[11px] font-medium">{uploading ? "…" : "Upload"}</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            className="hidden"
+                            onChange={e => e.target.files?.length && upload(e.target.files)}
+                          />
+                        </label>
                       )}
                     </div>
-                  ))}
-                  {form.image_urls.length < MAX_IMAGES && (
-                    <label className="aspect-square border border-dashed border-border flex flex-col items-center justify-center gap-1 cursor-pointer text-xs text-muted-foreground hover:bg-muted">
-                      <Upload className="w-4 h-4" />
-                      {uploading ? "…" : "Upload"}
-                      <input type="file" accept="image/*" multiple className="hidden"
-                        onChange={e => e.target.files?.length && upload(e.target.files)} />
+                    <p className="text-[11px] text-muted-foreground">
+                      Maksimal 5 gambar. Gambar pertama otomatis menjadi gambar utama.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider font-medium text-muted-foreground mb-1">
+                      Product Name
                     </label>
+                    <input
+                      required
+                      value={form.name}
+                      onChange={e => setForm(f => ({ ...f, name: e.target.value, slug: editing ? f.slug : slugify(e.target.value) }))}
+                      placeholder="misal: Daster Rayon Motif Bunga"
+                      className="w-full px-3 py-2.5 border border-border bg-background text-sm focus:outline-none focus:border-primary"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider font-medium text-muted-foreground mb-1">
+                      URL Slug
+                    </label>
+                    <input
+                      required
+                      value={form.slug}
+                      onChange={e => setForm(f => ({ ...f, slug: e.target.value }))}
+                      placeholder="daster-rayon-motif-bunga"
+                      className="w-full px-3 py-2.5 border border-border bg-background font-mono text-xs focus:outline-none focus:border-primary"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider font-medium text-muted-foreground mb-1">
+                      Category
+                    </label>
+                    <select
+                      value={form.category_id}
+                      onChange={e => setForm(f => ({ ...f, category_id: e.target.value }))}
+                      className="w-full px-3 py-2.5 border border-border bg-background text-sm focus:outline-none focus:border-primary"
+                    >
+                      <option value="">Uncategorised</option>
+                      {cats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider font-medium text-muted-foreground mb-1">
+                      Description
+                    </label>
+                    <textarea
+                      rows={4}
+                      value={form.description}
+                      onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                      placeholder="Tuliskan deskripsi produk..."
+                      className="w-full px-3 py-2.5 border border-border bg-background text-sm leading-relaxed focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                </div>
+
+                {/* RIGHT COLUMN: Pricing, Stock, and Variants */}
+                <div className="space-y-4">
+                  <div className="bg-muted/30 border border-border p-4 space-y-4">
+                    <p className="text-xs uppercase tracking-wider font-medium text-foreground">
+                      Harga &amp; Stok Base
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs uppercase tracking-wider font-medium text-muted-foreground mb-1">
+                          Price (IDR)
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium select-none">
+                            Rp
+                          </span>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            required
+                            value={form.price ? form.price.toLocaleString("id-ID") : ""}
+                            onChange={e => {
+                              const raw = e.target.value.replace(/\D/g, "");
+                              setForm(f => ({ ...f, price: raw ? parseInt(raw, 10) : 0 }));
+                            }}
+                            placeholder="0"
+                            className="w-full pl-9 pr-3 py-2 border border-border bg-background text-sm focus:outline-none focus:border-primary"
+                          />
+                        </div>
+                        {form.price > 0 && (
+                          <p className="text-[11px] text-muted-foreground mt-1 font-mono">{formatIDR(form.price)}</p>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-xs uppercase tracking-wider font-medium text-muted-foreground mb-1">
+                          HPP / Modal
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium select-none">
+                            Rp
+                          </span>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            required
+                            value={form.hpp_price ? form.hpp_price.toLocaleString("id-ID") : ""}
+                            onChange={e => {
+                              const raw = e.target.value.replace(/\D/g, "");
+                              setForm(f => ({ ...f, hpp_price: raw ? parseInt(raw, 10) : 0 }));
+                            }}
+                            placeholder="0"
+                            className="w-full pl-9 pr-3 py-2 border border-border bg-background text-sm focus:outline-none focus:border-primary"
+                          />
+                        </div>
+                        {form.hpp_price > 0 && (
+                          <p className="text-[11px] text-muted-foreground mt-1 font-mono">{formatIDR(form.hpp_price)}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs uppercase tracking-wider font-medium text-muted-foreground mb-1">
+                        Stock Total
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        required
+                        value={form.stock}
+                        onChange={e => setForm(f => ({ ...f, stock: Number(e.target.value) }))}
+                        className="w-full px-3 py-2 border border-border bg-background text-sm focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                  </div>
+
+                  {editing ? (
+                    <div className="space-y-4">
+                      <ProductSizes productId={editing.id} />
+                      <ProductVariants productId={editing.id} />
+                    </div>
+                  ) : (
+                    <div className="border border-dashed border-border p-4 bg-muted/20 text-xs text-muted-foreground leading-relaxed">
+                      <p className="font-medium text-foreground mb-1">Pengaturan Ukuran, Model &amp; Motif</p>
+                      Simpan data utama produk terlebih dahulu, lalu opsi penambahan Size (LD), Model, dan Motif akan langsung dapat dikelola di form ini.
+                    </div>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">Maksimal 5 gambar. Gambar pertama menjadi gambar utama.</p>
+
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs uppercase tracking-wider text-muted-foreground">Name</label>
-                  <input required value={form.name}
-                    onChange={e => setForm(f => ({ ...f, name: e.target.value, slug: editing ? f.slug : slugify(e.target.value) }))}
-                    className="w-full mt-1 px-3 py-2.5 border border-border" />
-                </div>
-                <div>
-                  <label className="text-xs uppercase tracking-wider text-muted-foreground">Slug</label>
-                  <input required value={form.slug} onChange={e => setForm(f => ({ ...f, slug: e.target.value }))}
-                    className="w-full mt-1 px-3 py-2.5 border border-border font-mono text-sm" />
-                </div>
-              </div>
-              <div>
-                <label className="text-xs uppercase tracking-wider text-muted-foreground">Category</label>
-                <select value={form.category_id} onChange={e => setForm(f => ({ ...f, category_id: e.target.value }))}
-                  className="w-full mt-1 px-3 py-2.5 border border-border bg-background">
-                  <option value="">Uncategorised</option>
-                  {cats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="text-xs uppercase tracking-wider text-muted-foreground">Price (IDR)</label>
-                  <input type="number" min={0} required value={form.price}
-                    onChange={e => setForm(f => ({ ...f, price: Number(e.target.value) }))}
-                    className="w-full mt-1 px-3 py-2.5 border border-border" />
-                </div>
-                <div>
-                  <label className="text-xs uppercase tracking-wider text-muted-foreground">HPP / Modal</label>
-                  <input type="number" min={0} required value={form.hpp_price}
-                    onChange={e => setForm(f => ({ ...f, hpp_price: Number(e.target.value) }))}
-                    className="w-full mt-1 px-3 py-2.5 border border-border" />
-                </div>
-                <div>
-                  <label className="text-xs uppercase tracking-wider text-muted-foreground">Stock</label>
-                  <input type="number" min={0} required value={form.stock}
-                    onChange={e => setForm(f => ({ ...f, stock: Number(e.target.value) }))}
-                    className="w-full mt-1 px-3 py-2.5 border border-border" />
-                </div>
-              </div>
-              {editing ? (
-                <>
-                  <ProductSizes productId={editing.id} />
-                  <ProductVariants productId={editing.id} />
-                </>
-              ) : (
-                <p className="border border-dashed border-border p-3 text-xs text-muted-foreground">
-                  Simpan produk dulu, lalu tambahkan Size, Model & Motif di form ini.
-                </p>
-              )}
-              <div>
-                <label className="text-xs uppercase tracking-wider text-muted-foreground">Description</label>
-                <textarea rows={4} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-                  className="w-full mt-1 px-3 py-2.5 border border-border" />
-              </div>
-              <button type="submit" disabled={uploading} className="w-full py-2.5 bg-primary text-primary-foreground text-sm disabled:opacity-50">
-                {editing ? "Simpan perubahan" : "Simpan & lanjut ke Size/Model/Motif"}
-              </button>
             </form>
+
+            {/* Sticky Footer Action Bar */}
+            <div className="sticky bottom-0 bg-background border-t border-border p-4 sm:px-6 flex items-center justify-between shrink-0 z-10 shadow-lg">
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="px-4 py-2.5 border border-border text-sm text-foreground hover:bg-muted transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={save}
+                disabled={uploading}
+                className="px-6 py-2.5 bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                {editing ? "Simpan Perubahan" : "Simpan & Lanjut"}
+              </button>
+            </div>
           </div>
         </div>
       )}

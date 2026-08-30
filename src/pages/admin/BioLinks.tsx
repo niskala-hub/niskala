@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Pencil, Trash2, Plus, X, MousePointerClick, GripVertical } from "lucide-react";
+import { Pencil, Trash2, Plus, X, MousePointerClick, GripVertical, Link2, CheckCircle2, Trophy } from "lucide-react";
 import { ICON_NAMES } from "@/pages/LinkBio";
 import {
   DndContext,
@@ -81,9 +81,10 @@ function SortableRow({
       <td className="px-4 py-3">{l.title}</td>
       <td className="px-4 py-3 text-muted-foreground truncate max-w-xs">{l.url}</td>
       <td className="px-4 py-3 text-muted-foreground">{l.icon}</td>
-      <td className="px-4 py-3">
-        <span className="inline-flex items-center gap-1 text-muted-foreground">
-          <MousePointerClick className="w-3 h-3" /> {l.clicks}
+      <td className="px-4 py-3 font-medium">
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent/10 text-accent font-medium text-xs">
+          <MousePointerClick className="w-3.5 h-3.5" />
+          {l.clicks} clicks
         </span>
       </td>
       <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
@@ -123,7 +124,45 @@ export default function AdminBioLinks() {
     setRows(data || []);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+
+    const channel = supabase
+      .channel("admin-bio-links-changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "bio_links" },
+        (payload) => {
+          if (payload.eventType === "UPDATE") {
+            const updated = payload.new as BioLink;
+            setRows((prev) =>
+              prev.map((r) => (r.id === updated.id ? { ...r, ...updated } : r))
+            );
+          } else {
+            load();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const totalClicks = useMemo(() => {
+    return rows.reduce((sum, link) => sum + (link.clicks || 0), 0);
+  }, [rows]);
+
+  const activeLinksCount = useMemo(() => {
+    return rows.filter((link) => link.is_active).length;
+  }, [rows]);
+
+  const mostClickedLink = useMemo(() => {
+    if (!rows.length) return null;
+    const sorted = [...rows].sort((a, b) => (b.clicks || 0) - (a.clicks || 0));
+    return sorted[0].clicks > 0 ? sorted[0] : null;
+  }, [rows]);
 
   const openNew = () => {
     setEditing(null);
@@ -168,7 +207,7 @@ export default function AdminBioLinks() {
     load();
   };
 
-  const onDragEnd = async (e: DragEndEvent) => {
+  const onDragEnd = async (e: DragEvent | DragEndEvent) => {
     const { active, over } = e;
     if (!over || active.id === over.id) return;
     const oldIdx = rows.findIndex(r => r.id === active.id);
@@ -195,12 +234,44 @@ export default function AdminBioLinks() {
         <div>
           <h1 className="text-2xl md:text-3xl font-light">Bio Links</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {rows.length} total · public page at /links
+            Manage your bio links and track lead click engagement · public page at /links
           </p>
         </div>
         <button onClick={openNew} className="flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground text-sm">
           <Plus className="w-4 h-4" /> New link
         </button>
+      </div>
+
+      {/* Summary Stat Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 md:mb-8">
+        <div className="border border-border p-4 bg-background">
+          <div className="flex items-center gap-2 text-muted-foreground text-xs uppercase tracking-wider mb-2">
+            <MousePointerClick className="w-4 h-4 text-accent" />
+            <span>Total Leads Clicks</span>
+          </div>
+          <p className="text-3xl font-light">{totalClicks}</p>
+        </div>
+        <div className="border border-border p-4 bg-background">
+          <div className="flex items-center gap-2 text-muted-foreground text-xs uppercase tracking-wider mb-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+            <span>Active Bio Links</span>
+          </div>
+          <p className="text-3xl font-light">{activeLinksCount}</p>
+        </div>
+        <div className="border border-border p-4 bg-background">
+          <div className="flex items-center gap-2 text-muted-foreground text-xs uppercase tracking-wider mb-2">
+            <Trophy className="w-4 h-4 text-amber-500" />
+            <span>Most Clicked Link</span>
+          </div>
+          {mostClickedLink ? (
+            <div>
+              <p className="text-xl font-medium truncate">{mostClickedLink.title}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{mostClickedLink.clicks} clicks</p>
+            </div>
+          ) : (
+            <p className="text-xl font-light text-muted-foreground">-</p>
+          )}
+        </div>
       </div>
 
       {/* Mobile cards */}
@@ -215,7 +286,7 @@ export default function AdminBioLinks() {
                 </div>
                 <p className="text-xs text-muted-foreground truncate mb-2">{l.url}</p>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                  <span className="inline-flex items-center gap-1">
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-accent/10 text-accent font-medium text-xs">
                     <MousePointerClick className="w-3 h-3" /> {l.clicks} clicks
                   </span>
                   <span>{l.icon}</span>

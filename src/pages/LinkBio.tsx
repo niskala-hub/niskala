@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   Instagram, Mail, ShoppingBag, Globe, Youtube, MessageCircle,
   MapPin, Link2, Facebook, Music2, Phone, Star,
@@ -26,6 +27,14 @@ interface BioLink {
   clicks: number;
 }
 
+const formatUrl = (url: string) => {
+  if (!url) return "#";
+  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("mailto:") || url.startsWith("tel:")) {
+    return url;
+  }
+  return `https://${url}`;
+};
+
 export default function LinkBio() {
   const [links, setLinks] = useState<BioLink[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,22 +53,36 @@ export default function LinkBio() {
 
   const visible = useMemo(() => links, [links]);
 
-  const handleVisit = (id: string) => {
-    supabase.rpc("increment_bio_link_click", { _link_id: id });
+  const handleVisit = async (id: string) => {
+    // Optimistic local state update for instant response
+    setLinks((prev) =>
+      prev.map((link) =>
+        link.id === id ? { ...link, clicks: (link.clicks || 0) + 1 } : link
+      )
+    );
+
+    try {
+      const { error } = await supabase.rpc("increment_bio_link_click", { _link_id: id });
+      if (error) {
+        console.error("Failed to increment link click count:", error);
+      }
+    } catch (err) {
+      console.error("Error incrementing link click count:", err);
+    }
   };
 
   return (
     <div className="min-h-screen bg-[hsl(var(--warm-bg))]">
       <div className="w-full max-w-md mx-auto px-6 pt-16 pb-16">
-        <div className="flex flex-col items-center text-center mb-10">
-          <img src={logo} alt="NISKALA" className="w-16 h-16 mb-5" />
-          <h1 className="font-serif text-2xl tracking-[0.3em] uppercase text-foreground">
+        <Link to="/" className="flex flex-col items-center text-center mb-10 group cursor-pointer">
+          <img src={logo} alt="NISKALA" className="w-16 h-16 mb-5 transition-transform group-hover:scale-105" />
+          <h1 className="font-serif text-2xl tracking-[0.3em] uppercase text-foreground group-hover:text-accent transition-colors">
             NISKALA
           </h1>
           <p className="mt-3 text-sm text-muted-foreground max-w-xs">
             Handcrafted knitwear for a considered life.
           </p>
-        </div>
+        </Link>
 
         {loading ? (
           <p className="text-center text-sm text-muted-foreground">Loading…</p>
@@ -69,10 +92,11 @@ export default function LinkBio() {
           <div className="flex flex-col gap-3">
             {visible.map((link, i) => {
               const Icon = getIcon(link.icon);
+              const formattedUrl = formatUrl(link.url);
               return (
                 <a
                   key={link.id}
-                  href={link.url}
+                  href={formattedUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => handleVisit(link.id)}

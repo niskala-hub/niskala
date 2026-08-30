@@ -62,7 +62,7 @@ export default function ProductDetail() {
       seen.add(u);
       return true;
     });
-    const capped = unique.slice(0, 4);
+    const capped = unique.slice(0, 5);
     return capped.length > 0 ? capped : [resolveProductImage(null)];
   };
 
@@ -135,7 +135,9 @@ export default function ProductDetail() {
   const galleryThumbs = [
     ...(selectedMotif?.image_url ? [selectedMotif.image_url] : []),
     ...images,
-  ].filter((u, i, arr) => arr.indexOf(u) === i);
+  ]
+    .filter((u, i, arr) => arr.indexOf(u) === i)
+    .slice(0, 5);
 
   const selectedSize = sizes.find(s => s.id === sizeId) || null;
   const hasVariants = models.length > 0;
