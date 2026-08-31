@@ -238,6 +238,51 @@ export default function Users() {
         </button>
       </div>
 
+      {/* Pending password reset requests */}
+      {requests.length > 0 && (
+        <div className="mb-6 border border-amber-200 bg-amber-50/60">
+          <div className="px-4 py-3 border-b border-amber-200 flex items-center gap-2">
+            <KeyRound className="w-4 h-4 text-amber-600" />
+            <p className="text-sm font-medium text-amber-900">
+              Permintaan Reset Password ({requests.length})
+            </p>
+          </div>
+          <div className="divide-y divide-amber-200">
+            {requests.map(rq => {
+              const target = rows.find(r => r.id === rq.user_id || r.email === rq.email);
+              return (
+                <div key={rq.id} className="px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm truncate">{rq.email}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(rq.created_at).toLocaleString("id-ID")}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {target && canReset(target) && (
+                      <button
+                        onClick={() => { setResetTarget(target); setResetPassword(""); setShowResetPass(false); }}
+                        className="px-3 py-1.5 bg-primary text-primary-foreground text-xs"
+                      >
+                        Beri Password Baru
+                      </button>
+                    )}
+                    <button
+                      onClick={() => resolveRequest(rq.id)}
+                      disabled={busy}
+                      className="px-3 py-1.5 border border-amber-300 text-xs text-amber-900 disabled:opacity-50"
+                    >
+                      Tandai Selesai
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+
       {/* User List */}
       <div className="space-y-2">
         {rows.map(u => {
