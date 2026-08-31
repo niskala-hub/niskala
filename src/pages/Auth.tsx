@@ -143,8 +143,36 @@ export default function Auth() {
           {mode === "forgot" && !forgotSent && (
             <form onSubmit={handleForgot} className="space-y-4">
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Masukkan email akun Anda. Kami akan mengirimkan link untuk mereset password Anda.
+                Pilih cara reset password Anda.
               </p>
+
+              {/* Mode toggle */}
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  { v: "email", label: "Via Email" },
+                  { v: "owner", label: "Minta ke Owner" },
+                ] as const).map(o => (
+                  <button
+                    key={o.v}
+                    type="button"
+                    onClick={() => setForgotMode(o.v)}
+                    className={`py-2.5 text-sm border transition-colors ${
+                      forgotMode === o.v
+                        ? "border-foreground bg-primary text-primary-foreground"
+                        : "border-border text-muted-foreground hover:border-foreground"
+                    }`}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                {forgotMode === "email"
+                  ? "Kami akan mengirim link ke email Anda untuk membuat password baru."
+                  : "Permintaan Anda akan dikirim ke owner. Owner akan memberikan password baru, dan Anda wajib menggantinya saat login."}
+              </p>
+
               <div>
                 <label className="text-xs uppercase tracking-wider text-muted-foreground block mb-1.5">
                   Email
@@ -164,7 +192,7 @@ export default function Auth() {
                 disabled={busy}
                 className="w-full py-3 bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
               >
-                {busy ? "Mengirim…" : "Kirim Link Reset Password"}
+                {busy ? "Mengirim…" : forgotMode === "email" ? "Kirim Link Reset Password" : "Kirim Permintaan ke Owner"}
               </button>
 
               <button
@@ -186,9 +214,15 @@ export default function Auth() {
                 </svg>
               </div>
               <div>
-                <p className="font-medium text-foreground text-sm">Email terkirim!</p>
+                <p className="font-medium text-foreground text-sm">
+                  {forgotMode === "email" ? "Email terkirim!" : "Permintaan terkirim!"}
+                </p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Cek inbox <strong>{email}</strong> dan klik link reset password yang kami kirimkan.
+                  {forgotMode === "email" ? (
+                    <>Cek inbox <strong>{email}</strong> dan klik link reset password yang kami kirimkan.</>
+                  ) : (
+                    <>Owner akan menghubungi Anda dengan password baru untuk <strong>{email}</strong>.</>
+                  )}
                 </p>
               </div>
               <button
