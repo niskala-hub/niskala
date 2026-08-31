@@ -46,10 +46,15 @@ export default function Auth() {
     e.preventDefault();
     setBusy(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/change-password`,
+      const { data, error } = await supabase.functions.invoke("request-password-reset", {
+        body: {
+          email,
+          mode: forgotMode,
+          redirect_to: `${window.location.origin}/auth/change-password`,
+        },
       });
       if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
       setForgotSent(true);
     } catch (err: any) {
       toast({ title: "Gagal", description: err.message, variant: "destructive" });
