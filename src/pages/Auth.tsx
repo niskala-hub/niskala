@@ -14,6 +14,7 @@ export default function Auth() {
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [forgotSent, setForgotSent] = useState(false);
+  const [forgotMode, setForgotMode] = useState<"email" | "owner">("email");
   const { session, mustChangePassword, loading } = useAuth();
   const nav = useNavigate();
   const { toast } = useToast();
