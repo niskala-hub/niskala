@@ -114,7 +114,13 @@ export default function Users() {
     setBusy(true);
     try {
       const res = await supabase.functions.invoke("create-admin", {
-        body: { action: "invite", email: inviteEmail, password: invitePassword, role: inviteRole },
+        body: {
+          action: "invite",
+          email: inviteEmail,
+          password: invitePassword,
+          role: inviteRole,
+          redirect_to: `${window.location.origin}/auth/change-password`,
+        },
       });
       const errMsg = await getErrorMessage(res);
       if (errMsg) throw new Error(errMsg);
