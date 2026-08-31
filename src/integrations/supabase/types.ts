@@ -372,18 +372,21 @@ export type Database = {
           created_at: string
           email: string | null
           id: string
+          must_change_password: boolean
           updated_at: string
         }
         Insert: {
           created_at?: string
           email?: string | null
           id: string
+          must_change_password?: boolean
           updated_at?: string
         }
         Update: {
           created_at?: string
           email?: string | null
           id?: string
+          must_change_password?: boolean
           updated_at?: string
         }
         Relationships: []
@@ -425,9 +428,10 @@ export type Database = {
         Args: { _link_id: string }
         Returns: undefined
       }
+      is_owner_or_coowner: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      app_role: "admin" | "user" | "owner"
+      app_role: "admin" | "user" | "owner" | "co_owner"
       cash_flow_type: "inflow" | "outflow"
       size_category: "Reguler" | "Jumbo Size"
     }
@@ -557,7 +561,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "user", "owner"],
+      app_role: ["admin", "user", "owner", "co_owner"],
       cash_flow_type: ["inflow", "outflow"],
       size_category: ["Reguler", "Jumbo Size"],
     },
