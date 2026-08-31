@@ -45,6 +45,9 @@ function RoleIcon({ roles }: { roles: RoleType[] }) {
 export default function Users() {
   const { canManageUsers, isOwner, loading, user } = useAuth();
   const [rows, setRows] = useState<StaffUser[]>([]);
+  const [requests, setRequests] = useState<
+    { id: string; email: string; user_id: string | null; status: string; created_at: string }[]
+  >([]);
 
   // Invite form state
   const [openInvite, setOpenInvite] = useState(false);
