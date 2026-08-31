@@ -90,7 +90,38 @@ Deno.serve(async (req) => {
         { onConflict: 'user_id,role' },
       )
 
-      return json({ ok: true, user_id: newId })
+      // Send the invitation email (recovery link so they can set their own password)
+      let emailSent = false
+      let emailError: string | null = null
+      const redirectTo = typeof body?.redirect_to === 'string' ? body.redirect_to : ''
+      try {
+        const anon = createClient(
+          Deno.env.get('SUPABASE_URL')!,
+          Deno.env.get('SUPABASE_ANON_KEY')!,
+        )
+        const { error: mailErr } = await anon.auth.resetPasswordForEmail(email, {
+          redirectTo: redirectTo || undefined,
+        })
+        if (mailErr) emailError = mailErr.message
+        else emailSent = true
+      } catch (e) {
+        emailError = (e as Error).message
+      }
+
+      return json({ ok: true, user_id: newId, email_sent: emailSent, email_error: emailError })
+    }
+
+    // ── ACTION: resolve_reset_request ───────────────────────────
+    if (action === 'resolve_reset_request') {
+      const requestId = typeof body?.request_id === 'string' ? body.request_id : ''
+      if (!requestId) return json({ error: 'request_id diperlukan' }, 400)
+
+      const { error } = await admin
+        .from('password_reset_requests')
+        .update({ status: 'resolved', handled_by: callerId, handled_at: new Date().toISOString() })
+        .eq('id', requestId)
+      if (error) return json({ error: error.message }, 400)
+      return json({ ok: true })
     }
 
     // ── ACTION: reset_password ──────────────────────────────────
@@ -122,6 +153,13 @@ Deno.serve(async (req) => {
 
       // Mark must_change_password = true
       await admin.from('profiles').update({ must_change_password: true }).eq('id', targetUserId)
+
+      // Close any pending reset requests for this user
+      await admin
+        .from('password_reset_requests')
+        .update({ status: 'resolved', handled_by: callerId, handled_at: new Date().toISOString() })
+        .eq('user_id', targetUserId)
+        .eq('status', 'pending')
 
       return json({ ok: true })
     }

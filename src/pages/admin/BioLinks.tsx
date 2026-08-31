@@ -207,7 +207,7 @@ export default function AdminBioLinks() {
     load();
   };
 
-  const onDragEnd = async (e: DragEvent | DragEndEvent) => {
+  const onDragEnd = async (e: DragEndEvent) => {
     const { active, over } = e;
     if (!over || active.id === over.id) return;
     const oldIdx = rows.findIndex(r => r.id === active.id);
