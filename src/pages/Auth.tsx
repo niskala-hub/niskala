@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { getAppUrl } from "@/lib/utils";
 import { Eye, EyeOff, ArrowLeft } from "lucide-react";
 
 type Mode = "signin" | "forgot";
@@ -51,9 +52,10 @@ export default function Auth() {
         body: {
           email,
           mode: forgotMode,
-          redirect_to: `${window.location.origin}/auth/change-password`,
+          redirect_to: `${getAppUrl()}/auth/change-password`,
         },
       });
+
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
       setForgotSent(true);

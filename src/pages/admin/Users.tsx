@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { getAppUrl } from "@/lib/utils";
 import { Navigate } from "react-router-dom";
 import {
   Plus, Trash2, X, Crown, ShieldCheck, ShieldHalf, KeyRound, Eye, EyeOff, RefreshCw,
@@ -140,9 +141,10 @@ export default function Users() {
           email: inviteEmail,
           password: invitePassword,
           role: inviteRole,
-          redirect_to: `${window.location.origin}/auth/change-password`,
+          redirect_to: `${getAppUrl()}/auth/change-password`,
         },
       });
+
       const errMsg = await getErrorMessage(res);
       if (errMsg) throw new Error(errMsg);
       toast({ title: "Pengguna berhasil diundang", description: `${inviteEmail} — ${ROLE_LABEL[inviteRole]}` });

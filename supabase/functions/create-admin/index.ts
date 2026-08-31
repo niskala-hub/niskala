@@ -5,6 +5,119 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// ── Kirim email via Resend API ──────────────────────────────────────
+async function sendInviteEmail(
+  email: string,
+  inviteLink: string,
+  senderName: string,
+): Promise<{ sent: boolean; error: string | null }> {
+  const resendKey = Deno.env.get('RESEND_API_KEY') || ''
+  const fromEmail = Deno.env.get('EMAIL_FROM') || 'noreply@resend.dev'
+
+  if (!resendKey) {
+    return { sent: false, error: 'RESEND_API_KEY tidak dikonfigurasi' }
+  }
+
+  const html = `
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Undangan ${senderName}</title>
+</head>
+<body style="margin:0;padding:0;background:#f5f5f0;font-family:'Helvetica Neue',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f0;padding:40px 16px;">
+    <tr>
+      <td align="center">
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border:1px solid #e5e5e5;">
+          <!-- Header -->
+          <tr>
+            <td style="padding:40px 40px 24px;border-bottom:1px solid #f0f0f0;">
+              <p style="margin:0;font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#888;font-weight:500;">
+                ${senderName}
+              </p>
+              <h1 style="margin:8px 0 0;font-size:24px;font-weight:300;color:#1a1a1a;letter-spacing:-0.01em;">
+                Anda Diundang
+              </h1>
+            </td>
+          </tr>
+          <!-- Body -->
+          <tr>
+            <td style="padding:32px 40px;">
+              <p style="margin:0 0 16px;font-size:14px;color:#444;line-height:1.6;">
+                Halo,
+              </p>
+              <p style="margin:0 0 16px;font-size:14px;color:#444;line-height:1.6;">
+                Anda telah diundang untuk bergabung sebagai administrator di <strong>${senderName}</strong>.
+                Klik tombol di bawah untuk mengatur password dan mengakses dashboard.
+              </p>
+              <p style="margin:0 0 8px;font-size:12px;color:#888;">
+                Link ini berlaku selama 24 jam.
+              </p>
+            </td>
+          </tr>
+          <!-- CTA -->
+          <tr>
+            <td style="padding:0 40px 32px;">
+              <a href="${inviteLink}"
+                style="display:inline-block;padding:14px 32px;background:#1a1a1a;color:#ffffff;font-size:13px;font-weight:500;text-decoration:none;letter-spacing:0.05em;">
+                ATUR PASSWORD &amp; MASUK
+              </a>
+            </td>
+          </tr>
+          <!-- Link fallback -->
+          <tr>
+            <td style="padding:0 40px 32px;border-top:1px solid #f0f0f0;">
+              <p style="margin:24px 0 8px;font-size:12px;color:#888;line-height:1.6;">
+                Jika tombol tidak berfungsi, salin link berikut ke browser:
+              </p>
+              <p style="margin:0;font-size:11px;color:#1a1a1a;word-break:break-all;">
+                ${inviteLink}
+              </p>
+            </td>
+          </tr>
+          <!-- Footer -->
+          <tr>
+            <td style="padding:20px 40px;background:#fafafa;border-top:1px solid #f0f0f0;">
+              <p style="margin:0;font-size:11px;color:#bbb;line-height:1.6;">
+                Jika Anda merasa tidak mengharapkan undangan ini, abaikan email ini.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${resendKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: `${senderName} <${fromEmail}>`,
+        to: [email],
+        subject: `Undangan untuk bergabung di ${senderName}`,
+        html,
+      }),
+    })
+
+    const result = await res.json()
+    if (!res.ok) {
+      return { sent: false, error: result?.message || `Resend error: ${res.status}` }
+    }
+    return { sent: true, error: null }
+  } catch (e) {
+    return { sent: false, error: (e as Error).message }
+  }
+}
+
+// ── Main Handler ────────────────────────────────────────────────────
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
@@ -53,11 +166,12 @@ Deno.serve(async (req) => {
       const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : ''
       const password = typeof body?.password === 'string' ? body.password : ''
       const role = typeof body?.role === 'string' ? body.role : 'admin'
+      const appName = Deno.env.get('APP_NAME') || 'NISKALA'
 
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || email.length > 255) {
         return json({ error: 'Email tidak valid' }, 400)
       }
-      if (password.length < 8 || password.length > 72) {
+      if (password && (password.length < 8 || password.length > 72)) {
         return json({ error: 'Password minimal 8 karakter' }, 400)
       }
 
@@ -67,45 +181,93 @@ Deno.serve(async (req) => {
         return json({ error: `Co-owner tidak bisa membuat role ${role}` }, 403)
       }
 
-      // Create user with email confirmed
-      const { data: created, error: createErr } = await admin.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
+      const defaultSiteUrl = Deno.env.get('APP_URL') || Deno.env.get('SITE_URL') || ''
+      const redirectTo = typeof body?.redirect_to === 'string' && body.redirect_to.trim() !== ''
+        ? body.redirect_to
+        : (defaultSiteUrl ? `${defaultSiteUrl.replace(/\/+$/, '')}/auth/change-password` : undefined)
+
+      // ── Step 1: Buat user via inviteUserByEmail (ini generate magic link)
+      const { data: inviteData, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(email, {
+        redirectTo: redirectTo || undefined,
       })
-      if (createErr) return json({ error: createErr.message }, 400)
 
-      const newId = created.user!.id
+      if (inviteErr) {
+        // Jika user sudah ada, coba buat ulang dengan createUser
+        const { data: created, error: createErr } = await admin.auth.admin.createUser({
+          email,
+          password: password || undefined,
+          email_confirm: true,
+        })
+        if (createErr) {
+          return json({ error: `Gagal membuat user: ${inviteErr.message}` }, 400)
+        }
+        const newId = created.user!.id
 
-      // Insert profile with must_change_password = true
+        if (password) {
+          await admin.auth.admin.updateUserById(newId, { password })
+        }
+
+        await admin.from('profiles').upsert({ id: newId, email, must_change_password: true })
+        await admin.from('user_roles').upsert({ user_id: newId, role }, { onConflict: 'user_id,role' })
+
+        // Kirim email reset password sebagai alternatif invitation
+        const { sent, error: mailErr } = await sendInviteEmail(email, redirectTo || `${defaultSiteUrl}/auth`, appName)
+
+        return json({ ok: true, user_id: newId, email_sent: sent, email_error: mailErr })
+      }
+
+      const newId = inviteData.user.id
+
+      // ── Step 2: Set password default jika disediakan
+      if (password) {
+        await admin.auth.admin.updateUserById(newId, { password })
+      }
+
+      // ── Step 3: Simpan profile
       await admin.from('profiles').upsert({
         id: newId,
         email,
         must_change_password: true,
       })
 
-      // Assign role
+      // ── Step 4: Assign role
       await admin.from('user_roles').upsert(
         { user_id: newId, role },
         { onConflict: 'user_id,role' },
       )
 
-      // Send the invitation email (recovery link so they can set their own password)
+      // ── Step 5: Generate magic link untuk email custom
+      const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
+        type: 'invite',
+        email,
+        options: {
+          redirectTo: redirectTo || undefined,
+        },
+      })
+
       let emailSent = false
       let emailError: string | null = null
-      const redirectTo = typeof body?.redirect_to === 'string' ? body.redirect_to : ''
-      try {
+
+      if (!linkErr && linkData?.properties?.action_link) {
+        // Kirim email custom via Resend dengan link yang tepat
+        const { sent, error: mailErr } = await sendInviteEmail(
+          email,
+          linkData.properties.action_link,
+          appName,
+        )
+        emailSent = sent
+        emailError = mailErr
+      } else {
+        // Fallback: Coba kirim via Supabase SMTP bawaan
         const anon = createClient(
           Deno.env.get('SUPABASE_URL')!,
           Deno.env.get('SUPABASE_ANON_KEY')!,
         )
-        const { error: mailErr } = await anon.auth.resetPasswordForEmail(email, {
+        const { error: resetErr } = await anon.auth.resetPasswordForEmail(email, {
           redirectTo: redirectTo || undefined,
         })
-        if (mailErr) emailError = mailErr.message
-        else emailSent = true
-      } catch (e) {
-        emailError = (e as Error).message
+        emailSent = !resetErr
+        emailError = resetErr?.message || null
       }
 
       return json({ ok: true, user_id: newId, email_sent: emailSent, email_error: emailError })
