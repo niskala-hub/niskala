@@ -154,6 +154,13 @@ Deno.serve(async (req) => {
       // Mark must_change_password = true
       await admin.from('profiles').update({ must_change_password: true }).eq('id', targetUserId)
 
+      // Close any pending reset requests for this user
+      await admin
+        .from('password_reset_requests')
+        .update({ status: 'resolved', handled_by: callerId, handled_at: new Date().toISOString() })
+        .eq('user_id', targetUserId)
+        .eq('status', 'pending')
+
       return json({ ok: true })
     }
 
