@@ -87,6 +87,24 @@ export default function Users() {
         mustChangePassword: mcpMap.get(x.id) ?? false,
       }))
     );
+    const rq = await supabase
+      .from("password_reset_requests")
+      .select("id,email,user_id,status,created_at")
+      .eq("status", "pending")
+      .order("created_at", { ascending: false });
+    setRequests(rq.data || []);
+  };
+
+  const resolveRequest = async (id: string) => {
+    setBusy(true);
+    const res = await supabase.functions.invoke("create-admin", {
+      body: { action: "resolve_reset_request", request_id: id },
+    });
+    setBusy(false);
+    if ((res.data as any)?.error || res.error) {
+      return toast({ title: "Gagal", description: (res.data as any)?.error ?? res.error?.message, variant: "destructive" });
+    }
+    load();
   };
 
   useEffect(() => { if (canManageUsers) load(); }, [canManageUsers]);
