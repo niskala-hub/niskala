@@ -15,16 +15,23 @@ export default function ChangePassword() {
   const nav = useNavigate();
   const { toast } = useToast();
 
+  // Recovery links arrive with tokens in the URL hash; give Supabase time to
+  // establish the recovery session before deciding to redirect.
+  const hash = typeof window !== "undefined" ? window.location.hash : "";
+  const isRecoveryLink = hash.includes("type=recovery") || hash.includes("access_token");
+  const linkError = new URLSearchParams(hash.replace(/^#/, "")).get("error_description");
+
   useEffect(() => {
-    if (!loading) {
-      // If not logged in, redirect to auth
-      if (!session) {
-        nav("/auth", { replace: true });
-      }
-      // If logged in and does NOT need to change password, redirect to admin
-      // (This handles the reset-via-email case where Supabase sets a recovery session)
+    if (loading || session) return;
+    if (isRecoveryLink) {
+      // wait a moment for the session to be picked up from the URL
+      const t = setTimeout(() => {
+        if (!session) nav("/auth", { replace: true });
+      }, 2500);
+      return () => clearTimeout(t);
     }
-  }, [session, loading, nav]);
+    nav("/auth", { replace: true });
+  }, [session, loading, nav, isRecoveryLink]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
