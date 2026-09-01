@@ -80,15 +80,61 @@ export default function ChangePassword() {
     return () => { active = false; };
   }, [emailType, isTokenHashLink, tokenHash]);
 
+  // 1. Verifikasi Token Hash (Jika menggunakan Mode PKCE/Custom Link)
+  useEffect(() => {
+    if (!isTokenHashLink || !tokenHash || (emailType !== "recovery" && emailType !== "invite")) return;
+
+    let active = true;
+    setVerifyingLink(true);
+
+    const verifyToken = async () => {
+      // 1. Clear session lama agar tidak bentrok
+      await supabase.auth.signOut();
+
+      // 2. Verifikasi token hash baru
+      const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: emailType });
+
+      if (!active) return;
+
+      if (error) {
+        setUrlError({
+          title: "Link Tidak Valid atau Kadaluwarsa",
+          description: error.message,
+        });
+      } else {
+        // Clean query params dari URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+      setVerifyingLink(false);
+    };
+
+    verifyToken();
+
+    return () => { active = false; };
+  }, [emailType, isTokenHashLink, tokenHash]);
+
+  // 2. Tangani Listener Auth State dari Hash URL (Native Supabase Redirect)
+  useEffect(() => {
+    // Biarkan Supabase listener menangkap session dari hash URL (#access_token=...)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
+        // Hapus hash error/access_token dari URL setelah session berhasil ditangkap
+        if (window.location.hash) {
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // 3. Redirect ke /auth HANYA jika memang tidak ada session & tidak ada link recovery yang sedang diproses
   useEffect(() => {
     if (loading || verifyingLink || session || urlError) return;
-    if (isRecoveryLink) {
-      // wait a moment for the session to be picked up from the URL
-      const t = setTimeout(() => {
-        if (!session) nav("/auth", { replace: true });
-      }, 2500);
-      return () => clearTimeout(t);
-    }
+
+    // Jika URL memiliki fragment hash/query recovery tapi session belum siap, tunggu hingga SDK siap
+    if (isRecoveryLink) return;
+
     nav("/auth", { replace: true });
   }, [session, loading, verifyingLink, nav, isRecoveryLink, urlError]);
 
@@ -230,11 +276,10 @@ export default function ChangePassword() {
                   minLength={8}
                   value={confirm}
                   onChange={e => setConfirm(e.target.value)}
-                  className={`w-full px-4 py-3 border bg-background focus:outline-none transition-colors text-sm pr-11 ${
-                    confirm && confirm !== newPassword
-                      ? "border-red-400 focus:border-red-500"
-                      : "border-border focus:border-foreground"
-                  }`}
+                  className={`w-full px-4 py-3 border bg-background focus:outline-none transition-colors text-sm pr-11 ${confirm && confirm !== newPassword
+                    ? "border-red-400 focus:border-red-500"
+                    : "border-border focus:border-foreground"
+                    }`}
                   placeholder="Ulangi password baru"
                 />
                 <button
@@ -257,11 +302,10 @@ export default function ChangePassword() {
                 {[1, 2, 3, 4].map(i => (
                   <div
                     key={i}
-                    className={`h-1 flex-1 rounded-full transition-colors ${
-                      newPassword.length >= i * 3
-                        ? newPassword.length >= 12 ? "bg-green-500" : newPassword.length >= 8 ? "bg-amber-400" : "bg-red-400"
-                        : "bg-muted"
-                    }`}
+                    className={`h-1 flex-1 rounded-full transition-colors ${newPassword.length >= i * 3
+                      ? newPassword.length >= 12 ? "bg-green-500" : newPassword.length >= 8 ? "bg-amber-400" : "bg-red-400"
+                      : "bg-muted"
+                      }`}
                   />
                 ))}
               </div>

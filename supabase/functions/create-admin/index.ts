@@ -94,47 +94,32 @@ async function sendInviteEmail(
 </body>
 </html>`
 
-  if (resendKey && !resendKey.startsWith('re_GANTI')) {
-    try {
-      const res = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${resendKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          from: `${senderName} <${fromEmail}>`,
-          to: [email],
-          subject: `Undangan untuk bergabung di ${senderName}`,
-          html,
-        }),
-      })
-
-      const result = await res.json()
-      if (res.ok) {
-        return { sent: true, error: null }
-      }
-      console.warn('Resend API returned error, falling back to Supabase SMTP:', result)
-    } catch (e) {
-      console.warn('Resend fetch failed, falling back to Supabase SMTP:', e)
-    }
+  if (!resendKey || resendKey.startsWith('re_GANTI')) {
+    return { sent: false, error: 'RESEND_API_KEY tidak dikonfigurasi atau masih placeholder' }
   }
 
-  // Fallback: Kirim email via Supabase SMTP bawaan (yang dikonfigurasi di Dashboard Supabase)
   try {
-    const anon = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_ANON_KEY')!,
-    )
-    const { error: resetErr } = await anon.auth.resetPasswordForEmail(email, {
-      redirectTo: AUTH_REDIRECT_URL,
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${resendKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: `${senderName} <${fromEmail}>`,
+        to: [email],
+        subject: `Undangan untuk bergabung di ${senderName}`,
+        html,
+      }),
     })
-    if (resetErr) {
-      return { sent: false, error: `Resend & Supabase SMTP gagal: ${resetErr.message}` }
+
+    const result = await res.json()
+    if (res.ok) {
+      return { sent: true, error: null }
     }
-    return { sent: true, error: null }
-  } catch (err: any) {
-    return { sent: false, error: (err as Error).message }
+    return { sent: false, error: result?.message || `Resend error: ${res.status}` }
+  } catch (e) {
+    return { sent: false, error: (e as Error).message }
   }
 }
 
@@ -207,6 +192,11 @@ Deno.serve(async (req) => {
         return json({ error: `Co-owner tidak bisa membuat role ${role}` }, 403)
       }
 
+      const defaultSiteUrl = Deno.env.get('APP_URL') || Deno.env.get('SITE_URL') || ''
+      const redirectTo = typeof body?.redirect_to === 'string' && body.redirect_to.trim() !== ''
+        ? body.redirect_to
+        : (defaultSiteUrl ? `${defaultSiteUrl.replace(/\/+$/, '')}/auth/change-password` : AUTH_REDIRECT_URL)
+
       // Cek apakah user sudah terdaftar di profiles
       const { data: existingProf } = await admin
         .from('profiles')
@@ -218,34 +208,72 @@ Deno.serve(async (req) => {
         if (!existingProf.must_change_password) {
           return json({ error: 'Pengguna dengan email ini sudah terdaftar dan akunnya aktif.' }, 400)
         }
-        // Jika must_change_password masih true, resend invitation link
-        const { data: recData, error: recErr } = await admin.auth.admin.generateLink({
-          type: 'recovery',
-          email,
-          options: { redirectTo: AUTH_REDIRECT_URL },
+        // User belum ganti password, resend invite
+        const { error: resetErr } = await admin.auth.resetPasswordForEmail(email, { redirectTo })
+        if (resetErr) {
+          return json({ error: `Gagal mengirim ulang undangan: ${resetErr.message}` }, 400)
+        }
+        return json({ ok: true, user_id: existingProf.id, resent: true, email_sent: true })
+      }
+
+      const resendKey = Deno.env.get('RESEND_API_KEY') || ''
+      const hasResend = resendKey && !resendKey.startsWith('re_GANTI')
+
+      let userId: string | null = null
+      let emailSent = false
+      let emailError: string | null = null
+
+if (hasResend) {
+  const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
+    type: 'invite',
+    email,
+    options: { redirectTo },
+  })
+
+  if (linkErr || !linkData?.user) {
+    return json({ error: `Gagal membuat undangan: ${linkErr?.message || 'User tidak terbuat'}` }, 400)
+  }
+
+  userId = linkData.user.id
+  
+  // Ambil hashed_token dari properti Supabase
+  const hashedToken = linkData.properties?.hashed_token
+
+  if (hashedToken) {
+    // Susun link custom langsung ke frontend (memotong /auth/v1/verify bawaan Supabase)
+    const customInviteLink = `${redirectTo}?token_hash=${hashedToken}&type=invite`
+    
+    const resendRes = await sendInviteEmail(email, customInviteLink, appName)
+    emailSent = resendRes.sent
+    emailError = resendRes.error
+    if (!emailSent) {
+      console.warn('Resend gagal:', emailError)
+    }
+  }
+} else {
+        // ── Mode B: Supabase Native SMTP ────────────────────────
+        // inviteUserByEmail secara otomatis mengirim email via SMTP yang dikonfigurasi
+        // di Supabase Dashboard (satu call = satu email, tanpa double-send).
+        const { data: inviteData, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(email, {
+          redirectTo,
         })
 
-        const tokenHash = recData?.properties?.hashed_token
-        if (recErr || !tokenHash) {
-          return json({ error: `Gagal membuat link undangan: ${recErr?.message || 'Link tidak tersedia'}` }, 400)
+        if (inviteErr) {
+          return json({ error: `Gagal mengirim undangan email: ${inviteErr.message}` }, 400)
         }
 
-        const { sent, error: mailErr } = await sendInviteEmail(email, buildPasswordLink(tokenHash, 'recovery'), appName)
-        return json({ ok: true, user_id: existingProf.id, resent: true, email_sent: sent, email_error: mailErr })
+        userId = inviteData.user.id
+        emailSent = true
       }
 
-      // Create the account first. Generating an invite token and then updating the
-      // password invalidates that one-time token, so the recovery link is created last.
-      const { data: created, error: createErr } = await admin.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-      })
-
-      if (createErr || !created.user) {
-        return json({ error: `Gagal mendaftarkan pengguna: ${createErr?.message || 'Terjadi kesalahan'}` }, 400)
+      if (!userId) {
+        return json({ error: 'Gagal mendaftarkan pengguna' }, 400)
       }
-      const userId = created.user.id
+
+      // Update password default jika disediakan
+      if (password) {
+        await admin.auth.admin.updateUserById(userId, { password })
+      }
 
       // Upsert profile
       await admin.from('profiles').upsert({
@@ -258,22 +286,6 @@ Deno.serve(async (req) => {
       await admin.from('user_roles').upsert(
         { user_id: userId, role },
         { onConflict: 'user_id,role' },
-      )
-
-      const { data: recoveryData, error: recoveryErr } = await admin.auth.admin.generateLink({
-        type: 'recovery',
-        email,
-        options: { redirectTo: AUTH_REDIRECT_URL },
-      })
-      const tokenHash = recoveryData?.properties?.hashed_token
-      if (recoveryErr || !tokenHash) {
-        return json({ error: `Akun dibuat, tetapi link undangan gagal dibuat: ${recoveryErr?.message || 'Token tidak tersedia'}` }, 400)
-      }
-
-      const { sent: emailSent, error: emailError } = await sendInviteEmail(
-        email,
-        buildPasswordLink(tokenHash, 'recovery'),
-        appName,
       )
 
       return json({ ok: true, user_id: userId, email_sent: emailSent, email_error: emailError })
@@ -334,29 +346,49 @@ Deno.serve(async (req) => {
       }
 
       const appName = Deno.env.get('APP_NAME') || 'NISKALA'
-      // Existing users receive a fresh recovery token.
-      const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
-        type: 'recovery',
-        email: targetEmail,
-        options: { redirectTo: AUTH_REDIRECT_URL },
-      })
+// Ambil origin pengakses (misal: http://localhost:8080 atau https://niskalawear.com)
+const requestOrigin = req.headers.get('origin') || ''
 
-      const tokenHash = linkData?.properties?.hashed_token
-      if (linkErr || !tokenHash) {
-        return json({ error: `Gagal membuat link undangan: ${linkErr?.message || 'Link tidak tersedia'}` }, 400)
+const defaultSiteUrl = requestOrigin || Deno.env.get('APP_URL') || Deno.env.get('SITE_URL') || ''
+
+const redirectTo = typeof body?.redirect_to === 'string' && body.redirect_to.trim() !== ''
+  ? body.redirect_to
+  : (defaultSiteUrl ? `${defaultSiteUrl.replace(/\/+$/, '')}/auth/change-password` : AUTH_REDIRECT_URL)
+
+      const resendKey = Deno.env.get('RESEND_API_KEY') || ''
+      const hasResend = resendKey && !resendKey.startsWith('re_GANTI')
+
+      let emailSent = false
+      let emailError: string | null = null
+
+if (hasResend) {
+  const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
+    type: 'magiclink',
+    email: targetEmail,
+    options: { redirectTo },
+  })
+
+  const hashedToken = linkData?.properties?.hashed_token
+  if (hashedToken) {
+    const customInviteLink = `${redirectTo}?token_hash=${hashedToken}&type=recovery`
+    const resendRes = await sendInviteEmail(targetEmail, customInviteLink, appName)
+    emailSent = resendRes.sent
+    emailError = resendRes.error
+  } else {
+    emailError = linkErr?.message || 'Gagal membuat magic link'
+  }
+} else {
+        // ── Mode B: Supabase Native SMTP (satu call saja) ────────
+        const { error: resetErr } = await admin.auth.resetPasswordForEmail(targetEmail, {
+          redirectTo,
+        })
+        if (resetErr) {
+          return json({ error: `Gagal mengirim email undangan: ${resetErr.message}` }, 400)
+        }
+        emailSent = true
       }
 
-      const { sent, error: mailErr } = await sendInviteEmail(
-        targetEmail,
-        buildPasswordLink(tokenHash, 'recovery'),
-        appName,
-      )
-
-      if (!sent && mailErr) {
-        return json({ error: `Gagal mengirim email: ${mailErr}` }, 400)
-      }
-
-      return json({ ok: true, email_sent: sent })
+      return json({ ok: true, email_sent: emailSent, email_error: emailError })
     }
 
     // ── ACTION: resolve_reset_request ───────────────────────────
