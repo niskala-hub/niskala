@@ -224,8 +224,9 @@ Deno.serve(async (req) => {
       let emailError: string | null = null
 
 if (hasResend) {
+  // Gunakan type 'magiclink' untuk penukaran token OTP yang paling stabil di Supabase
   const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
-    type: 'invite',
+    type: 'magiclink',
     email,
     options: { redirectTo },
   })
@@ -238,14 +239,17 @@ if (hasResend) {
   const hashedToken = linkData.properties?.hashed_token
 
   if (hashedToken) {
-    // GANTI type=invite MENJADI type=signup
-    const customInviteLink = `${redirectTo}?token_hash=${hashedToken}&type=signup`
+    // Gunakan type=recovery agar verifyOtp di frontend mengenali token secara konsisten
+    const customInviteLink = `${redirectTo}?token_hash=${hashedToken}&type=recovery`
     
     const resendRes = await sendInviteEmail(email, customInviteLink, appName)
     emailSent = resendRes.sent
     emailError = resendRes.error
+    if (!emailSent) {
+      console.warn('Resend gagal:', emailError)
+    }
   }
-}else {
+} else {
         // ── Mode B: Supabase Native SMTP ────────────────────────
         // inviteUserByEmail secara otomatis mengirim email via SMTP yang dikonfigurasi
         // di Supabase Dashboard (satu call = satu email, tanpa double-send).

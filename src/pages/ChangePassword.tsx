@@ -49,8 +49,11 @@ export default function ChangePassword() {
   const search = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
   const tokenHash = search?.get("token_hash") ?? null;
   const emailType = search?.get("type");
+
   const isTokenHashLink = !!tokenHash && (emailType === "recovery" || emailType === "invite" || emailType === "signup");
   const isRecoveryLink = isTokenHashLink || hash.includes("type=recovery") || hash.includes("access_token") || hash.includes("type=invite") || hash.includes("type=signup");
+
+  // 1. Cek error bawaan URL hash
   useEffect(() => {
     const err = getAuthErrorFromUrl();
     if (err) {
@@ -58,7 +61,7 @@ export default function ChangePassword() {
     }
   }, []);
 
-
+  // 2. Verifikasi Token Hash (TUNGGAL - TIDAK ADA DUPLIKASI)
   useEffect(() => {
     if (!isTokenHashLink || !tokenHash) return;
 
@@ -66,12 +69,12 @@ export default function ChangePassword() {
     setVerifyingLink(true);
 
     const verifyToken = async () => {
-      // Cast 'invite' atau 'signup' ke tipe yang valid bagi verifyOtp
+      // Map 'invite' atau 'signup' ke type yang diterima verifyOtp
       const targetType = (emailType === "invite" ? "signup" : emailType) as "signup" | "recovery";
 
-      const { data, error } = await supabase.auth.verifyOtp({
+      const { error } = await supabase.auth.verifyOtp({
         token_hash: tokenHash,
-        type: targetType
+        type: targetType,
       });
 
       if (!active) return;
@@ -81,48 +84,10 @@ export default function ChangePassword() {
           title: "Link Tidak Valid atau Kadaluwarsa",
           description: error.message,
         });
-        setVerifyingLink(false);
       } else {
-        // 1. Bersihkan query params dari URL
+        // Hapus query params dari URL agar tidak terverifikasi ulang saat refresh
         window.history.replaceState({}, document.title, window.location.pathname);
-
-        // 2. Refresh profile/session agar useAuth me-load session baru
-        await refreshProfile();
-
-        // 3. Matikan status verifying
-        setVerifyingLink(false);
-      }
-    };
-
-    verifyToken();
-
-    return () => { active = false; };
-  }, [emailType, isTokenHashLink, tokenHash, refreshProfile]);
-
-  // 1. Verifikasi Token Hash (Jika menggunakan Mode PKCE/Custom Link)
-  useEffect(() => {
-    if (!isTokenHashLink || !tokenHash || (emailType !== "recovery" && emailType !== "invite")) return;
-
-    let active = true;
-    setVerifyingLink(true);
-
-    const verifyToken = async () => {
-      // 1. Clear session lama agar tidak bentrok
-      await supabase.auth.signOut();
-
-      // 2. Verifikasi token hash baru
-      const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: emailType });
-
-      if (!active) return;
-
-      if (error) {
-        setUrlError({
-          title: "Link Tidak Valid atau Kadaluwarsa",
-          description: error.message,
-        });
-      } else {
-        // Clean query params dari URL
-        window.history.replaceState({}, document.title, window.location.pathname);
+        if (refreshProfile) await refreshProfile();
       }
       setVerifyingLink(false);
     };
@@ -130,14 +95,12 @@ export default function ChangePassword() {
     verifyToken();
 
     return () => { active = false; };
-  }, [emailType, isTokenHashLink, tokenHash]);
+  }, [emailType, isTokenHashLink, tokenHash, refreshProfile]);
 
-  // 2. Tangani Listener Auth State dari Hash URL (Native Supabase Redirect)
+  // 3. Listener perubahan Auth State dari Hash URL
   useEffect(() => {
-    // Biarkan Supabase listener menangkap session dari hash URL (#access_token=...)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
-        // Hapus hash error/access_token dari URL setelah session berhasil ditangkap
         if (window.location.hash) {
           window.history.replaceState({}, document.title, window.location.pathname);
         }
@@ -147,11 +110,9 @@ export default function ChangePassword() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // 3. Redirect ke /auth HANYA jika memang tidak ada session & tidak ada link recovery yang sedang diproses
+  // 4. Redirect Guard: HANYA me-redirect jika tidak sedang verifikasi & memang tidak ada session
   useEffect(() => {
     if (loading || verifyingLink || session || urlError) return;
-
-    // Jika URL memiliki fragment hash/query recovery tapi session belum siap, tunggu hingga SDK siap
     if (isRecoveryLink) return;
 
     nav("/auth", { replace: true });
@@ -170,11 +131,9 @@ export default function ChangePassword() {
 
     setBusy(true);
     try {
-      // Update password via Supabase Auth
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
 
-      // Clear must_change_password flag in profile
       if (session?.user) {
         await supabase
           .from("profiles")
@@ -240,7 +199,6 @@ export default function ChangePassword() {
     <div className="min-h-screen flex items-center justify-center bg-[hsl(var(--warm-bg))] px-4 py-16">
       <div className="w-full max-w-md">
         <div className="bg-background border border-border p-8 shadow-sm">
-          {/* Header */}
           <div className="flex items-start gap-4 mb-8">
             <div className="w-10 h-10 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center shrink-0">
               <ShieldCheck className="w-5 h-5 text-amber-600" />
@@ -257,7 +215,6 @@ export default function ChangePassword() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* New Password */}
             <div>
               <label className="text-xs uppercase tracking-wider text-muted-foreground block mb-1.5">
                 Password Baru
@@ -283,7 +240,6 @@ export default function ChangePassword() {
               </div>
             </div>
 
-            {/* Confirm Password */}
             <div>
               <label className="text-xs uppercase tracking-wider text-muted-foreground block mb-1.5">
                 Konfirmasi Password
@@ -315,7 +271,6 @@ export default function ChangePassword() {
               )}
             </div>
 
-            {/* Strength hint */}
             {newPassword.length > 0 && (
               <div className="flex gap-1">
                 {[1, 2, 3, 4].map(i => (
