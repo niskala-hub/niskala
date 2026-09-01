@@ -49,9 +49,8 @@ export default function ChangePassword() {
   const search = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
   const tokenHash = search?.get("token_hash") ?? null;
   const emailType = search?.get("type");
-  const isTokenHashLink = !!tokenHash && (emailType === "recovery" || emailType === "invite");
-  const isRecoveryLink = isTokenHashLink || hash.includes("type=recovery") || hash.includes("access_token") || hash.includes("type=invite");
-
+  const isTokenHashLink = !!tokenHash && (emailType === "recovery" || emailType === "invite" || emailType === "signup");
+  const isRecoveryLink = isTokenHashLink || hash.includes("type=recovery") || hash.includes("access_token") || hash.includes("type=invite") || hash.includes("type=signup");
   useEffect(() => {
     const err = getAuthErrorFromUrl();
     if (err) {
@@ -59,26 +58,46 @@ export default function ChangePassword() {
     }
   }, []);
 
+
   useEffect(() => {
-    if (!isTokenHashLink || !tokenHash || (emailType !== "recovery" && emailType !== "invite")) return;
+    if (!isTokenHashLink || !tokenHash) return;
 
     let active = true;
     setVerifyingLink(true);
-    supabase.auth.verifyOtp({ token_hash: tokenHash, type: emailType }).then(({ error }) => {
+
+    const verifyToken = async () => {
+      // Cast 'invite' atau 'signup' ke tipe yang valid bagi verifyOtp
+      const targetType = (emailType === "invite" ? "signup" : emailType) as "signup" | "recovery";
+
+      const { data, error } = await supabase.auth.verifyOtp({
+        token_hash: tokenHash,
+        type: targetType
+      });
+
       if (!active) return;
+
       if (error) {
         setUrlError({
           title: "Link Tidak Valid atau Kadaluwarsa",
           description: error.message,
         });
+        setVerifyingLink(false);
       } else {
+        // 1. Bersihkan query params dari URL
         window.history.replaceState({}, document.title, window.location.pathname);
+
+        // 2. Refresh profile/session agar useAuth me-load session baru
+        await refreshProfile();
+
+        // 3. Matikan status verifying
+        setVerifyingLink(false);
       }
-      setVerifyingLink(false);
-    });
+    };
+
+    verifyToken();
 
     return () => { active = false; };
-  }, [emailType, isTokenHashLink, tokenHash]);
+  }, [emailType, isTokenHashLink, tokenHash, refreshProfile]);
 
   // 1. Verifikasi Token Hash (Jika menggunakan Mode PKCE/Custom Link)
   useEffect(() => {

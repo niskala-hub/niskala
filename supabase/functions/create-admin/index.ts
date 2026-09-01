@@ -235,22 +235,17 @@ if (hasResend) {
   }
 
   userId = linkData.user.id
-  
-  // Ambil hashed_token dari properti Supabase
   const hashedToken = linkData.properties?.hashed_token
 
   if (hashedToken) {
-    // Susun link custom langsung ke frontend (memotong /auth/v1/verify bawaan Supabase)
-    const customInviteLink = `${redirectTo}?token_hash=${hashedToken}&type=invite`
+    // GANTI type=invite MENJADI type=signup
+    const customInviteLink = `${redirectTo}?token_hash=${hashedToken}&type=signup`
     
     const resendRes = await sendInviteEmail(email, customInviteLink, appName)
     emailSent = resendRes.sent
     emailError = resendRes.error
-    if (!emailSent) {
-      console.warn('Resend gagal:', emailError)
-    }
   }
-} else {
+}else {
         // ── Mode B: Supabase Native SMTP ────────────────────────
         // inviteUserByEmail secara otomatis mengirim email via SMTP yang dikonfigurasi
         // di Supabase Dashboard (satu call = satu email, tanpa double-send).
