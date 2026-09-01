@@ -94,28 +94,47 @@ async function sendInviteEmail(
 </body>
 </html>`
 
-  try {
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${resendKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: `${senderName} <${fromEmail}>`,
-        to: [email],
-        subject: `Undangan untuk bergabung di ${senderName}`,
-        html,
-      }),
-    })
+  if (resendKey && !resendKey.startsWith('re_GANTI')) {
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${resendKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: `${senderName} <${fromEmail}>`,
+          to: [email],
+          subject: `Undangan untuk bergabung di ${senderName}`,
+          html,
+        }),
+      })
 
-    const result = await res.json()
-    if (!res.ok) {
-      return { sent: false, error: result?.message || `Resend error: ${res.status}` }
+      const result = await res.json()
+      if (res.ok) {
+        return { sent: true, error: null }
+      }
+      console.warn('Resend API returned error, falling back to Supabase SMTP:', result)
+    } catch (e) {
+      console.warn('Resend fetch failed, falling back to Supabase SMTP:', e)
+    }
+  }
+
+  // Fallback: Kirim email via Supabase SMTP bawaan (yang dikonfigurasi di Dashboard Supabase)
+  try {
+    const anon = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+    )
+    const { error: resetErr } = await anon.auth.resetPasswordForEmail(email, {
+      redirectTo: AUTH_REDIRECT_URL,
+    })
+    if (resetErr) {
+      return { sent: false, error: `Resend & Supabase SMTP gagal: ${resetErr.message}` }
     }
     return { sent: true, error: null }
-  } catch (e) {
-    return { sent: false, error: (e as Error).message }
+  } catch (err: any) {
+    return { sent: false, error: (err as Error).message }
   }
 }
 
