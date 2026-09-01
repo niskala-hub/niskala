@@ -1,5 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
+const AUTH_REDIRECT_URL = 'https://niskalawear.com/auth/change-password'
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -117,6 +119,11 @@ async function sendInviteEmail(
   }
 }
 
+function buildPasswordLink(tokenHash: string, type: 'invite' | 'recovery'): string {
+  const params = new URLSearchParams({ token_hash: tokenHash, type })
+  return `${AUTH_REDIRECT_URL}?${params.toString()}`
+}
+
 // ── Main Handler ────────────────────────────────────────────────────
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -181,11 +188,6 @@ Deno.serve(async (req) => {
         return json({ error: `Co-owner tidak bisa membuat role ${role}` }, 403)
       }
 
-      const defaultSiteUrl = Deno.env.get('APP_URL') || Deno.env.get('SITE_URL') || ''
-      const redirectTo = typeof body?.redirect_to === 'string' && body.redirect_to.trim() !== ''
-        ? body.redirect_to
-        : (defaultSiteUrl ? `${defaultSiteUrl.replace(/\/+$/, '')}/auth/change-password` : undefined)
-
       // Cek apakah user sudah terdaftar di profiles
       const { data: existingProf } = await admin
         .from('profiles')
@@ -199,68 +201,32 @@ Deno.serve(async (req) => {
         }
         // Jika must_change_password masih true, resend invitation link
         const { data: recData, error: recErr } = await admin.auth.admin.generateLink({
-          type: 'magiclink',
+          type: 'recovery',
           email,
-          options: { redirectTo: redirectTo || undefined },
+          options: { redirectTo: AUTH_REDIRECT_URL },
         })
 
-        const actionLink = recData?.properties?.action_link
-        if (recErr || !actionLink) {
+        const tokenHash = recData?.properties?.hashed_token
+        if (recErr || !tokenHash) {
           return json({ error: `Gagal membuat link undangan: ${recErr?.message || 'Link tidak tersedia'}` }, 400)
         }
 
-        const { sent, error: mailErr } = await sendInviteEmail(email, actionLink, appName)
+        const { sent, error: mailErr } = await sendInviteEmail(email, buildPasswordLink(tokenHash, 'recovery'), appName)
         return json({ ok: true, user_id: existingProf.id, resent: true, email_sent: sent, email_error: mailErr })
       }
 
-      // Generate Single Link & Create User via generateLink (tanpa double call ke inviteUserByEmail)
-      let userId: string | null = null
-      let actionLink: string | null = null
-
-      const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
-        type: 'invite',
+      // Create the account first. Generating an invite token and then updating the
+      // password invalidates that one-time token, so the recovery link is created last.
+      const { data: created, error: createErr } = await admin.auth.admin.createUser({
         email,
-        options: { redirectTo: redirectTo || undefined },
+        password,
+        email_confirm: true,
       })
 
-      if (!linkErr && linkData?.user) {
-        userId = linkData.user.id
-        actionLink = linkData.properties?.action_link || null
-      } else {
-        // Jika generateLink gagal (misal user sudah ada di auth.users tapi belum ada di profiles)
-        const { data: created, error: createErr } = await admin.auth.admin.createUser({
-          email,
-          password: password || undefined,
-          email_confirm: true,
-        })
-        if (createErr && !created?.user) {
-          // Coba buat magiclink
-          const { data: recData } = await admin.auth.admin.generateLink({
-            type: 'magiclink',
-            email,
-            options: { redirectTo: redirectTo || undefined },
-          })
-          actionLink = recData?.properties?.action_link || null
-          userId = recData?.user?.id || null
-        } else if (created?.user) {
-          userId = created.user.id
-          const { data: recData } = await admin.auth.admin.generateLink({
-            type: 'magiclink',
-            email,
-            options: { redirectTo: redirectTo || undefined },
-          })
-          actionLink = recData?.properties?.action_link || null
-        }
+      if (createErr || !created.user) {
+        return json({ error: `Gagal mendaftarkan pengguna: ${createErr?.message || 'Terjadi kesalahan'}` }, 400)
       }
-
-      if (!userId) {
-        return json({ error: `Gagal mendaftarkan pengguna: ${linkErr?.message || 'Terjadi kesalahan'}` }, 400)
-      }
-
-      // Update password default jika disediakan
-      if (password) {
-        await admin.auth.admin.updateUserById(userId, { password })
-      }
+      const userId = created.user.id
 
       // Upsert profile
       await admin.from('profiles').upsert({
@@ -275,24 +241,21 @@ Deno.serve(async (req) => {
         { onConflict: 'user_id,role' },
       )
 
-      let emailSent = false
-      let emailError: string | null = null
-
-      if (actionLink) {
-        const { sent, error: mailErr } = await sendInviteEmail(email, actionLink, appName)
-        emailSent = sent
-        emailError = mailErr
-      } else {
-        const anon = createClient(
-          Deno.env.get('SUPABASE_URL')!,
-          Deno.env.get('SUPABASE_ANON_KEY')!,
-        )
-        const { error: resetErr } = await anon.auth.resetPasswordForEmail(email, {
-          redirectTo: redirectTo || undefined,
-        })
-        emailSent = !resetErr
-        emailError = resetErr?.message || null
+      const { data: recoveryData, error: recoveryErr } = await admin.auth.admin.generateLink({
+        type: 'recovery',
+        email,
+        options: { redirectTo: AUTH_REDIRECT_URL },
+      })
+      const tokenHash = recoveryData?.properties?.hashed_token
+      if (recoveryErr || !tokenHash) {
+        return json({ error: `Akun dibuat, tetapi link undangan gagal dibuat: ${recoveryErr?.message || 'Token tidak tersedia'}` }, 400)
       }
+
+      const { sent: emailSent, error: emailError } = await sendInviteEmail(
+        email,
+        buildPasswordLink(tokenHash, 'recovery'),
+        appName,
+      )
 
       return json({ ok: true, user_id: userId, email_sent: emailSent, email_error: emailError })
     }
@@ -352,35 +315,23 @@ Deno.serve(async (req) => {
       }
 
       const appName = Deno.env.get('APP_NAME') || 'NISKALA'
-      const defaultSiteUrl = Deno.env.get('APP_URL') || Deno.env.get('SITE_URL') || ''
-      const redirectTo = typeof body?.redirect_to === 'string' && body.redirect_to.trim() !== ''
-        ? body.redirect_to
-        : (defaultSiteUrl ? `${defaultSiteUrl.replace(/\/+$/, '')}/auth/change-password` : undefined)
-
-      // Generate invitation link (magiclink/recovery for existing user)
-      let { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
-        type: 'magiclink',
+      // Existing users receive a fresh recovery token.
+      const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
+        type: 'recovery',
         email: targetEmail,
-        options: { redirectTo: redirectTo || undefined },
+        options: { redirectTo: AUTH_REDIRECT_URL },
       })
 
-      if (linkErr || !linkData?.properties?.action_link) {
-        const resRecovery = await admin.auth.admin.generateLink({
-          type: 'recovery',
-          email: targetEmail,
-          options: { redirectTo: redirectTo || undefined },
-        })
-        linkData = resRecovery.data
-        linkErr = resRecovery.error
-      }
-
-      if (linkErr || !linkData?.properties?.action_link) {
+      const tokenHash = linkData?.properties?.hashed_token
+      if (linkErr || !tokenHash) {
         return json({ error: `Gagal membuat link undangan: ${linkErr?.message || 'Link tidak tersedia'}` }, 400)
       }
 
-      const actionLink = linkData.properties.action_link
-
-      const { sent, error: mailErr } = await sendInviteEmail(targetEmail, actionLink, appName)
+      const { sent, error: mailErr } = await sendInviteEmail(
+        targetEmail,
+        buildPasswordLink(tokenHash, 'recovery'),
+        appName,
+      )
 
       if (!sent && mailErr) {
         return json({ error: `Gagal mengirim email: ${mailErr}` }, 400)

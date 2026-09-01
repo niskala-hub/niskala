@@ -38,6 +38,7 @@ export default function ChangePassword() {
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [verifyingLink, setVerifyingLink] = useState(false);
   const [urlError, setUrlError] = useState<{ title: string; description: string } | null>(null);
 
   const { session, mustChangePassword, loading, refreshProfile } = useAuth();
@@ -45,7 +46,11 @@ export default function ChangePassword() {
   const { toast } = useToast();
 
   const hash = typeof window !== "undefined" ? window.location.hash : "";
-  const isRecoveryLink = hash.includes("type=recovery") || hash.includes("access_token") || hash.includes("type=invite");
+  const search = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+  const tokenHash = search?.get("token_hash") ?? null;
+  const emailType = search?.get("type");
+  const isTokenHashLink = !!tokenHash && (emailType === "recovery" || emailType === "invite");
+  const isRecoveryLink = isTokenHashLink || hash.includes("type=recovery") || hash.includes("access_token") || hash.includes("type=invite");
 
   useEffect(() => {
     const err = getAuthErrorFromUrl();
@@ -55,7 +60,28 @@ export default function ChangePassword() {
   }, []);
 
   useEffect(() => {
-    if (loading || session || urlError) return;
+    if (!isTokenHashLink || !tokenHash || (emailType !== "recovery" && emailType !== "invite")) return;
+
+    let active = true;
+    setVerifyingLink(true);
+    supabase.auth.verifyOtp({ token_hash: tokenHash, type: emailType }).then(({ error }) => {
+      if (!active) return;
+      if (error) {
+        setUrlError({
+          title: "Link Tidak Valid atau Kadaluwarsa",
+          description: error.message,
+        });
+      } else {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+      setVerifyingLink(false);
+    });
+
+    return () => { active = false; };
+  }, [emailType, isTokenHashLink, tokenHash]);
+
+  useEffect(() => {
+    if (loading || verifyingLink || session || urlError) return;
     if (isRecoveryLink) {
       // wait a moment for the session to be picked up from the URL
       const t = setTimeout(() => {
@@ -64,7 +90,7 @@ export default function ChangePassword() {
       return () => clearTimeout(t);
     }
     nav("/auth", { replace: true });
-  }, [session, loading, nav, isRecoveryLink, urlError]);
+  }, [session, loading, verifyingLink, nav, isRecoveryLink, urlError]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,7 +128,7 @@ export default function ChangePassword() {
     }
   };
 
-  if (loading) {
+  if (loading || verifyingLink) {
     return <div className="min-h-screen flex items-center justify-center text-sm text-muted-foreground">Loading…</div>;
   }
 

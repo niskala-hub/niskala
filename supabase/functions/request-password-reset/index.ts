@@ -1,5 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
+const AUTH_REDIRECT_URL = 'https://niskalawear.com/auth/change-password'
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -117,6 +119,11 @@ async function sendResetEmail(
   }
 }
 
+function buildRecoveryLink(tokenHash: string): string {
+  const params = new URLSearchParams({ token_hash: tokenHash, type: 'recovery' })
+  return `${AUTH_REDIRECT_URL}?${params.toString()}`
+}
+
 // ── Main Handler ────────────────────────────────────────────────────
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -130,10 +137,6 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json().catch(() => null)
     const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : ''
-    const defaultSiteUrl = Deno.env.get('APP_URL') || Deno.env.get('SITE_URL') || ''
-    const redirectTo = typeof body?.redirect_to === 'string' && body.redirect_to.trim() !== ''
-      ? body.redirect_to
-      : (defaultSiteUrl ? `${defaultSiteUrl.replace(/\/+$/, '')}/auth/change-password` : undefined)
     const mode = body?.mode === 'owner' ? 'owner' : 'email'
     const appName = Deno.env.get('APP_NAME') || 'NISKALA'
 
@@ -169,15 +172,16 @@ Deno.serve(async (req) => {
         type: 'recovery',
         email,
         options: {
-          redirectTo: redirectTo || undefined,
+          redirectTo: AUTH_REDIRECT_URL,
         },
       })
 
-      if (!linkErr && linkData?.properties?.action_link) {
+      const tokenHash = linkData?.properties?.hashed_token
+      if (!linkErr && tokenHash) {
         // Kirim email custom via Resend
         const { sent, error: mailErr } = await sendResetEmail(
           email,
-          linkData.properties.action_link,
+          buildRecoveryLink(tokenHash),
           appName,
         )
 
@@ -188,7 +192,7 @@ Deno.serve(async (req) => {
             Deno.env.get('SUPABASE_ANON_KEY')!,
           )
           const { error: anonErr } = await anon.auth.resetPasswordForEmail(email, {
-            redirectTo: redirectTo || undefined,
+            redirectTo: AUTH_REDIRECT_URL,
           })
           if (anonErr) {
             console.error('Resend error:', mailErr, '| Supabase SMTP error:', anonErr.message)
@@ -201,7 +205,7 @@ Deno.serve(async (req) => {
           Deno.env.get('SUPABASE_ANON_KEY')!,
         )
         const { error: anonErr } = await anon.auth.resetPasswordForEmail(email, {
-          redirectTo: redirectTo || undefined,
+          redirectTo: AUTH_REDIRECT_URL,
         })
         if (anonErr) {
           return json({ error: anonErr.message }, 400)

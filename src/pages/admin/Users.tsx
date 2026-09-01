@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { getAppUrl } from "@/lib/utils";
 import { Navigate } from "react-router-dom";
 import {
   Plus, Trash2, X, Crown, ShieldCheck, ShieldHalf, KeyRound, Eye, EyeOff, RefreshCw, Send,
@@ -141,7 +140,7 @@ export default function Users() {
           email: inviteEmail,
           password: invitePassword,
           role: inviteRole,
-          redirect_to: `${getAppUrl()}/auth/change-password`,
+          redirect_to: "https://niskalawear.com/auth/change-password",
         },
       });
 
@@ -165,7 +164,7 @@ export default function Users() {
         body: {
           action: "resend_invite",
           user_id: u.id,
-          redirect_to: `${getAppUrl()}/auth/change-password`,
+          redirect_to: "https://niskalawear.com/auth/change-password",
         },
       });
 

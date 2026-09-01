@@ -3,7 +3,6 @@ import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { getAppUrl } from "@/lib/utils";
 import { Eye, EyeOff, ArrowLeft } from "lucide-react";
 
 type Mode = "signin" | "forgot";
@@ -69,7 +68,7 @@ export default function Auth() {
         body: {
           email,
           mode: forgotMode,
-          redirect_to: `${getAppUrl()}/auth/change-password`,
+          redirect_to: "https://niskalawear.com/auth/change-password",
         },
       });
 
