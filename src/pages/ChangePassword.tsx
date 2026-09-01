@@ -3,7 +3,34 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, EyeOff, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, ShieldCheck, AlertTriangle } from "lucide-react";
+
+function getAuthErrorFromUrl(): { title: string; description: string } | null {
+  if (typeof window === "undefined") return null;
+  const hashStr = window.location.hash.replace(/^#/, "");
+  const searchStr = window.location.search.replace(/^\?/, "");
+
+  const hashParams = new URLSearchParams(hashStr);
+  const searchParams = new URLSearchParams(searchStr);
+
+  const error = hashParams.get("error") || searchParams.get("error");
+  const errorCode = hashParams.get("error_code") || searchParams.get("error_code");
+  const errorDesc = hashParams.get("error_description") || searchParams.get("error_description");
+
+  if (!error && !errorCode && !errorDesc) return null;
+
+  let title = "Link Tidak Valid atau Kadaluwarsa";
+  let description = "Link dari email yang Anda buka tidak valid atau sudah kadaluwarsa.";
+
+  if (errorCode === "otp_expired" || errorDesc?.toLowerCase().includes("expired")) {
+    title = "Link Email Kadaluwarsa";
+    description = "Link dari email yang Anda buka telah kadaluwarsa (expired) dan tidak dapat digunakan lagi.";
+  } else if (errorDesc) {
+    description = decodeURIComponent(errorDesc.replace(/\+/g, " "));
+  }
+
+  return { title, description };
+}
 
 export default function ChangePassword() {
   const [newPassword, setNewPassword] = useState("");
@@ -11,18 +38,24 @@ export default function ChangePassword() {
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [urlError, setUrlError] = useState<{ title: string; description: string } | null>(null);
+
   const { session, mustChangePassword, loading, refreshProfile } = useAuth();
   const nav = useNavigate();
   const { toast } = useToast();
 
-  // Recovery links arrive with tokens in the URL hash; give Supabase time to
-  // establish the recovery session before deciding to redirect.
   const hash = typeof window !== "undefined" ? window.location.hash : "";
-  const isRecoveryLink = hash.includes("type=recovery") || hash.includes("access_token");
-  const linkError = new URLSearchParams(hash.replace(/^#/, "")).get("error_description");
+  const isRecoveryLink = hash.includes("type=recovery") || hash.includes("access_token") || hash.includes("type=invite");
 
   useEffect(() => {
-    if (loading || session) return;
+    const err = getAuthErrorFromUrl();
+    if (err) {
+      setUrlError(err);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (loading || session || urlError) return;
     if (isRecoveryLink) {
       // wait a moment for the session to be picked up from the URL
       const t = setTimeout(() => {
@@ -31,7 +64,7 @@ export default function ChangePassword() {
       return () => clearTimeout(t);
     }
     nav("/auth", { replace: true });
-  }, [session, loading, nav, isRecoveryLink]);
+  }, [session, loading, nav, isRecoveryLink, urlError]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,6 +104,45 @@ export default function ChangePassword() {
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center text-sm text-muted-foreground">Loading…</div>;
+  }
+
+  if (urlError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[hsl(var(--warm-bg))] px-4 py-16">
+        <div className="w-full max-w-md">
+          <div className="bg-background border border-border p-8 shadow-sm text-center">
+            <div className="w-12 h-12 rounded-full bg-red-50 border border-red-200 flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle className="w-6 h-6 text-red-600" />
+            </div>
+            <h1 className="text-xl font-light text-foreground mb-2">{urlError.title}</h1>
+            <p className="text-sm text-muted-foreground leading-relaxed mb-6">
+              {urlError.description}
+            </p>
+
+            <div className="bg-amber-50 border border-amber-200 p-4 text-left rounded mb-6 text-xs text-amber-900 leading-relaxed space-y-2">
+              <p className="font-semibold">Solusi yang dapat Anda lakukan:</p>
+              <p>• <strong>Jika Anda diundang oleh Owner/Co-Owner:</strong> Minta pengundang Anda untuk menekan tombol <strong>"Resend Invitation" (Kirim Ulang Undangan)</strong> di daftar pengguna.</p>
+              <p>• <strong>Jika Anda mencoba Reset Password:</strong> Silakan minta link reset password baru melalui halaman masuk.</p>
+            </div>
+
+            <div className="space-y-2">
+              <button
+                onClick={() => nav("/auth")}
+                className="w-full py-3 bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
+              >
+                Ke Halaman Masuk
+              </button>
+              <button
+                onClick={() => nav("/auth?mode=forgot")}
+                className="w-full py-2.5 border border-border text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Minta Reset Password Baru
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

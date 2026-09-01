@@ -186,79 +186,103 @@ Deno.serve(async (req) => {
         ? body.redirect_to
         : (defaultSiteUrl ? `${defaultSiteUrl.replace(/\/+$/, '')}/auth/change-password` : undefined)
 
-      // ── Step 1: Buat user via inviteUserByEmail (ini generate magic link)
-      const { data: inviteData, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(email, {
-        redirectTo: redirectTo || undefined,
+      // Cek apakah user sudah terdaftar di profiles
+      const { data: existingProf } = await admin
+        .from('profiles')
+        .select('id, must_change_password')
+        .eq('email', email)
+        .maybeSingle()
+
+      if (existingProf) {
+        if (!existingProf.must_change_password) {
+          return json({ error: 'Pengguna dengan email ini sudah terdaftar dan akunnya aktif.' }, 400)
+        }
+        // Jika must_change_password masih true, resend invitation link
+        const { data: recData, error: recErr } = await admin.auth.admin.generateLink({
+          type: 'magiclink',
+          email,
+          options: { redirectTo: redirectTo || undefined },
+        })
+
+        const actionLink = recData?.properties?.action_link
+        if (recErr || !actionLink) {
+          return json({ error: `Gagal membuat link undangan: ${recErr?.message || 'Link tidak tersedia'}` }, 400)
+        }
+
+        const { sent, error: mailErr } = await sendInviteEmail(email, actionLink, appName)
+        return json({ ok: true, user_id: existingProf.id, resent: true, email_sent: sent, email_error: mailErr })
+      }
+
+      // Generate Single Link & Create User via generateLink (tanpa double call ke inviteUserByEmail)
+      let userId: string | null = null
+      let actionLink: string | null = null
+
+      const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
+        type: 'invite',
+        email,
+        options: { redirectTo: redirectTo || undefined },
       })
 
-      if (inviteErr) {
-        // Jika user sudah ada, coba buat ulang dengan createUser
+      if (!linkErr && linkData?.user) {
+        userId = linkData.user.id
+        actionLink = linkData.properties?.action_link || null
+      } else {
+        // Jika generateLink gagal (misal user sudah ada di auth.users tapi belum ada di profiles)
         const { data: created, error: createErr } = await admin.auth.admin.createUser({
           email,
           password: password || undefined,
           email_confirm: true,
         })
-        if (createErr) {
-          return json({ error: `Gagal membuat user: ${inviteErr.message}` }, 400)
+        if (createErr && !created?.user) {
+          // Coba buat magiclink
+          const { data: recData } = await admin.auth.admin.generateLink({
+            type: 'magiclink',
+            email,
+            options: { redirectTo: redirectTo || undefined },
+          })
+          actionLink = recData?.properties?.action_link || null
+          userId = recData?.user?.id || null
+        } else if (created?.user) {
+          userId = created.user.id
+          const { data: recData } = await admin.auth.admin.generateLink({
+            type: 'magiclink',
+            email,
+            options: { redirectTo: redirectTo || undefined },
+          })
+          actionLink = recData?.properties?.action_link || null
         }
-        const newId = created.user!.id
-
-        if (password) {
-          await admin.auth.admin.updateUserById(newId, { password })
-        }
-
-        await admin.from('profiles').upsert({ id: newId, email, must_change_password: true })
-        await admin.from('user_roles').upsert({ user_id: newId, role }, { onConflict: 'user_id,role' })
-
-        // Kirim email reset password sebagai alternatif invitation
-        const { sent, error: mailErr } = await sendInviteEmail(email, redirectTo || `${defaultSiteUrl}/auth`, appName)
-
-        return json({ ok: true, user_id: newId, email_sent: sent, email_error: mailErr })
       }
 
-      const newId = inviteData.user.id
+      if (!userId) {
+        return json({ error: `Gagal mendaftarkan pengguna: ${linkErr?.message || 'Terjadi kesalahan'}` }, 400)
+      }
 
-      // ── Step 2: Set password default jika disediakan
+      // Update password default jika disediakan
       if (password) {
-        await admin.auth.admin.updateUserById(newId, { password })
+        await admin.auth.admin.updateUserById(userId, { password })
       }
 
-      // ── Step 3: Simpan profile
+      // Upsert profile
       await admin.from('profiles').upsert({
-        id: newId,
+        id: userId,
         email,
         must_change_password: true,
       })
 
-      // ── Step 4: Assign role
+      // Assign role
       await admin.from('user_roles').upsert(
-        { user_id: newId, role },
+        { user_id: userId, role },
         { onConflict: 'user_id,role' },
       )
-
-      // ── Step 5: Generate magic link untuk email custom
-      const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
-        type: 'invite',
-        email,
-        options: {
-          redirectTo: redirectTo || undefined,
-        },
-      })
 
       let emailSent = false
       let emailError: string | null = null
 
-      if (!linkErr && linkData?.properties?.action_link) {
-        // Kirim email custom via Resend dengan link yang tepat
-        const { sent, error: mailErr } = await sendInviteEmail(
-          email,
-          linkData.properties.action_link,
-          appName,
-        )
+      if (actionLink) {
+        const { sent, error: mailErr } = await sendInviteEmail(email, actionLink, appName)
         emailSent = sent
         emailError = mailErr
       } else {
-        // Fallback: Coba kirim via Supabase SMTP bawaan
         const anon = createClient(
           Deno.env.get('SUPABASE_URL')!,
           Deno.env.get('SUPABASE_ANON_KEY')!,
@@ -270,7 +294,99 @@ Deno.serve(async (req) => {
         emailError = resetErr?.message || null
       }
 
-      return json({ ok: true, user_id: newId, email_sent: emailSent, email_error: emailError })
+      return json({ ok: true, user_id: userId, email_sent: emailSent, email_error: emailError })
+    }
+
+    // ── ACTION: resend_invite ────────────────────────────────────
+    if (action === 'resend_invite') {
+      const targetUserId = typeof body?.user_id === 'string' ? body.user_id : ''
+      let targetEmail = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : ''
+
+      if (!targetUserId && !targetEmail) {
+        return json({ error: 'user_id atau email diperlukan' }, 400)
+      }
+
+      let userId = targetUserId
+      if (userId) {
+        const { data: prof, error: profErr } = await admin
+          .from('profiles')
+          .select('id, email, must_change_password')
+          .eq('id', userId)
+          .maybeSingle()
+
+        if (profErr || !prof) {
+          return json({ error: 'Pengguna tidak ditemukan' }, 404)
+        }
+        targetEmail = prof.email || targetEmail
+      } else if (targetEmail) {
+        const { data: prof } = await admin
+          .from('profiles')
+          .select('id, email, must_change_password')
+          .eq('email', targetEmail)
+          .maybeSingle()
+
+        if (prof) {
+          userId = prof.id
+        }
+      }
+
+      if (!targetEmail) {
+        return json({ error: 'Email pengguna tidak ditemukan' }, 404)
+      }
+
+      // Check role permissions: Co-owner cannot resend for owner or another co-owner
+      if (userId && !isOwner) {
+        const { data: targetRoles } = await admin
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', userId)
+        const targetRoleNames = (targetRoles || []).map((r: any) => r.role as string)
+        if (targetRoleNames.includes('owner') || targetRoleNames.includes('co_owner')) {
+          return json({ error: 'Co-owner tidak bisa mengirim ulang undangan untuk owner atau co-owner lain' }, 403)
+        }
+      }
+
+      // Ensure must_change_password is true
+      if (userId) {
+        await admin.from('profiles').update({ must_change_password: true }).eq('id', userId)
+      }
+
+      const appName = Deno.env.get('APP_NAME') || 'NISKALA'
+      const defaultSiteUrl = Deno.env.get('APP_URL') || Deno.env.get('SITE_URL') || ''
+      const redirectTo = typeof body?.redirect_to === 'string' && body.redirect_to.trim() !== ''
+        ? body.redirect_to
+        : (defaultSiteUrl ? `${defaultSiteUrl.replace(/\/+$/, '')}/auth/change-password` : undefined)
+
+      // Generate invitation link (magiclink/recovery for existing user)
+      let { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
+        type: 'magiclink',
+        email: targetEmail,
+        options: { redirectTo: redirectTo || undefined },
+      })
+
+      if (linkErr || !linkData?.properties?.action_link) {
+        const resRecovery = await admin.auth.admin.generateLink({
+          type: 'recovery',
+          email: targetEmail,
+          options: { redirectTo: redirectTo || undefined },
+        })
+        linkData = resRecovery.data
+        linkErr = resRecovery.error
+      }
+
+      if (linkErr || !linkData?.properties?.action_link) {
+        return json({ error: `Gagal membuat link undangan: ${linkErr?.message || 'Link tidak tersedia'}` }, 400)
+      }
+
+      const actionLink = linkData.properties.action_link
+
+      const { sent, error: mailErr } = await sendInviteEmail(targetEmail, actionLink, appName)
+
+      if (!sent && mailErr) {
+        return json({ error: `Gagal mengirim email: ${mailErr}` }, 400)
+      }
+
+      return json({ ok: true, email_sent: sent })
     }
 
     // ── ACTION: resolve_reset_request ───────────────────────────

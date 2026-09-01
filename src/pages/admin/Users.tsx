@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { getAppUrl } from "@/lib/utils";
 import { Navigate } from "react-router-dom";
 import {
-  Plus, Trash2, X, Crown, ShieldCheck, ShieldHalf, KeyRound, Eye, EyeOff, RefreshCw,
+  Plus, Trash2, X, Crown, ShieldCheck, ShieldHalf, KeyRound, Eye, EyeOff, RefreshCw, Send,
 } from "lucide-react";
 
 type RoleType = "owner" | "co_owner" | "admin";
@@ -157,6 +157,32 @@ export default function Users() {
     }
   };
 
+  // ── Resend Invitation ──────────────────────────────────────────
+  const handleResendInvite = async (u: StaffUser) => {
+    setBusy(true);
+    try {
+      const res = await supabase.functions.invoke("create-admin", {
+        body: {
+          action: "resend_invite",
+          user_id: u.id,
+          redirect_to: `${getAppUrl()}/auth/change-password`,
+        },
+      });
+
+      const errMsg = await getErrorMessage(res);
+      if (errMsg) throw new Error(errMsg);
+      toast({
+        title: "Undangan Terkirim Ulang",
+        description: `Link undangan baru telah dikirimkan ke email ${u.email}.`,
+      });
+      load();
+    } catch (err: any) {
+      toast({ title: "Gagal", description: err.message, variant: "destructive" });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   // ── Reset Password ──────────────────────────────────────────────
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -199,6 +225,14 @@ export default function Users() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const canResendInvite = (u: StaffUser) => {
+    if (u.id === user?.id) return false;
+    if (!u.mustChangePassword) return false;
+    if (u.roles.includes("owner")) return false;
+    if (u.roles.includes("co_owner") && !isOwner) return false;
+    return true;
   };
 
   const canDelete = (u: StaffUser) => {
@@ -307,7 +341,18 @@ export default function Users() {
               </div>
 
               {/* Actions */}
-              <div className="flex items-center gap-1 shrink-0">
+              <div className="flex items-center gap-1.5 shrink-0">
+                {canResendInvite(u) && (
+                  <button
+                    onClick={() => handleResendInvite(u)}
+                    disabled={busy}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-800 text-xs font-medium transition-colors disabled:opacity-50"
+                    title="Kirim ulang link email undangan"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Kirim Ulang Undangan</span>
+                  </button>
+                )}
                 {canReset(u) && (
                   <button
                     onClick={() => { setResetTarget(u); setResetPassword(""); setShowResetPass(false); }}

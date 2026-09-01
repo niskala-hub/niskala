@@ -30,6 +30,23 @@ export default function Auth() {
     }
   }, [session, mustChangePassword, loading, nav]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const searchParams = new URLSearchParams(window.location.search.replace(/^\?/, ""));
+    const errDesc = hashParams.get("error_description") || searchParams.get("error_description");
+    const errCode = hashParams.get("error_code") || searchParams.get("error_code");
+
+    if (errDesc || errCode) {
+      const msg = errDesc ? decodeURIComponent(errDesc.replace(/\+/g, " ")) : "Link email tidak valid atau kadaluwarsa.";
+      toast({
+        title: "Link Kadaluwarsa / Tidak Valid",
+        description: `${msg} Apabila ini undangan, minta Owner / Co-Owner untuk mengklik Resend Invitation (Kirim Ulang Undangan).`,
+        variant: "destructive",
+      });
+    }
+  }, [toast]);
+
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
