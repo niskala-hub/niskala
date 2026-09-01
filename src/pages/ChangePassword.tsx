@@ -58,7 +58,7 @@ export default function ChangePassword() {
     }
   }, []);
 
-
+  // 1. Verifikasi Token Hash jika URL mengandung query parameter token_hash (fallback PKCE/Custom)
   useEffect(() => {
     if (!isTokenHashLink || !tokenHash) return;
 
@@ -66,12 +66,16 @@ export default function ChangePassword() {
     setVerifyingLink(true);
 
     const verifyToken = async () => {
-      // Cast 'invite' atau 'signup' ke tipe yang valid bagi verifyOtp
-      const targetType = (emailType === "invite" ? "signup" : emailType) as "signup" | "recovery";
+      let otpType: "signup" | "recovery" | "invite" = "recovery";
+      if (emailType === "invite" || emailType === "signup") {
+        otpType = "signup";
+      } else if (emailType === "recovery") {
+        otpType = "recovery";
+      }
 
-      const { data, error } = await supabase.auth.verifyOtp({
+      const { error } = await supabase.auth.verifyOtp({
         token_hash: tokenHash,
-        type: targetType
+        type: otpType as any,
       });
 
       if (!active) return;
@@ -81,48 +85,10 @@ export default function ChangePassword() {
           title: "Link Tidak Valid atau Kadaluwarsa",
           description: error.message,
         });
-        setVerifyingLink(false);
       } else {
-        // 1. Bersihkan query params dari URL
+        // Clean query params dari URL setelah token berhasil diverifikasi
         window.history.replaceState({}, document.title, window.location.pathname);
-
-        // 2. Refresh profile/session agar useAuth me-load session baru
         await refreshProfile();
-
-        // 3. Matikan status verifying
-        setVerifyingLink(false);
-      }
-    };
-
-    verifyToken();
-
-    return () => { active = false; };
-  }, [emailType, isTokenHashLink, tokenHash, refreshProfile]);
-
-  // 1. Verifikasi Token Hash (Jika menggunakan Mode PKCE/Custom Link)
-  useEffect(() => {
-    if (!isTokenHashLink || !tokenHash || (emailType !== "recovery" && emailType !== "invite")) return;
-
-    let active = true;
-    setVerifyingLink(true);
-
-    const verifyToken = async () => {
-      // 1. Clear session lama agar tidak bentrok
-      await supabase.auth.signOut();
-
-      // 2. Verifikasi token hash baru
-      const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: emailType });
-
-      if (!active) return;
-
-      if (error) {
-        setUrlError({
-          title: "Link Tidak Valid atau Kadaluwarsa",
-          description: error.message,
-        });
-      } else {
-        // Clean query params dari URL
-        window.history.replaceState({}, document.title, window.location.pathname);
       }
       setVerifyingLink(false);
     };
@@ -130,15 +96,13 @@ export default function ChangePassword() {
     verifyToken();
 
     return () => { active = false; };
-  }, [emailType, isTokenHashLink, tokenHash]);
+  }, [emailType, isTokenHashLink, tokenHash, refreshProfile]);
 
-  // 2. Tangani Listener Auth State dari Hash URL (Native Supabase Redirect)
+  // 2. Tangani Listener Auth State dari Hash URL (#access_token=...)
   useEffect(() => {
-    // Biarkan Supabase listener menangkap session dari hash URL (#access_token=...)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
-        // Hapus hash error/access_token dari URL setelah session berhasil ditangkap
-        if (window.location.hash) {
+        if (window.location.hash && !window.location.hash.includes("error")) {
           window.history.replaceState({}, document.title, window.location.pathname);
         }
       }

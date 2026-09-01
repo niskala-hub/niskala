@@ -223,29 +223,34 @@ Deno.serve(async (req) => {
       let emailSent = false
       let emailError: string | null = null
 
-if (hasResend) {
-  const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
-    type: 'invite',
-    email,
-    options: { redirectTo },
-  })
+      if (hasResend) {
+        // ── Mode A: Resend API (custom HTML email) ──────────────
+        // Gunakan action_link resmi Supabase (yang mengarah ke /auth/v1/verify)
+        // agar token diverifikasi oleh server GoTrue Supabase secara valid.
+        const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
+          type: 'invite',
+          email,
+          options: { redirectTo },
+        })
 
-  if (linkErr || !linkData?.user) {
-    return json({ error: `Gagal membuat undangan: ${linkErr?.message || 'User tidak terbuat'}` }, 400)
-  }
+        if (linkErr || !linkData?.user) {
+          return json({ error: `Gagal membuat undangan: ${linkErr?.message || 'User tidak terbuat'}` }, 400)
+        }
 
-  userId = linkData.user.id
-  const hashedToken = linkData.properties?.hashed_token
+        userId = linkData.user.id
+        const actionLink = linkData.properties?.action_link
 
-  if (hashedToken) {
-    // GANTI type=invite MENJADI type=signup
-    const customInviteLink = `${redirectTo}?token_hash=${hashedToken}&type=signup`
-    
-    const resendRes = await sendInviteEmail(email, customInviteLink, appName)
-    emailSent = resendRes.sent
-    emailError = resendRes.error
-  }
-}else {
+        if (actionLink) {
+          const resendRes = await sendInviteEmail(email, actionLink, appName)
+          emailSent = resendRes.sent
+          emailError = resendRes.error
+          if (!emailSent) {
+            console.warn('Resend gagal:', emailError)
+          }
+        } else {
+          emailError = linkErr?.message || 'Gagal generate action link'
+        }
+      } else {
         // ── Mode B: Supabase Native SMTP ────────────────────────
         // inviteUserByEmail secara otomatis mengirim email via SMTP yang dikonfigurasi
         // di Supabase Dashboard (satu call = satu email, tanpa double-send).
@@ -356,23 +361,23 @@ const redirectTo = typeof body?.redirect_to === 'string' && body.redirect_to.tri
       let emailSent = false
       let emailError: string | null = null
 
-if (hasResend) {
-  const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
-    type: 'magiclink',
-    email: targetEmail,
-    options: { redirectTo },
-  })
+      if (hasResend) {
+        // ── Mode A: Resend API (single magiclink token) ──────────
+        const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
+          type: 'magiclink',
+          email: targetEmail,
+          options: { redirectTo },
+        })
 
-  const hashedToken = linkData?.properties?.hashed_token
-  if (hashedToken) {
-    const customInviteLink = `${redirectTo}?token_hash=${hashedToken}&type=recovery`
-    const resendRes = await sendInviteEmail(targetEmail, customInviteLink, appName)
-    emailSent = resendRes.sent
-    emailError = resendRes.error
-  } else {
-    emailError = linkErr?.message || 'Gagal membuat magic link'
-  }
-} else {
+        const actionLink = linkData?.properties?.action_link
+        if (actionLink) {
+          const resendRes = await sendInviteEmail(targetEmail, actionLink, appName)
+          emailSent = resendRes.sent
+          emailError = resendRes.error
+        } else {
+          emailError = linkErr?.message || 'Gagal membuat magic link'
+        }
+      } else {
         // ── Mode B: Supabase Native SMTP (satu call saja) ────────
         const { error: resetErr } = await admin.auth.resetPasswordForEmail(targetEmail, {
           redirectTo,
