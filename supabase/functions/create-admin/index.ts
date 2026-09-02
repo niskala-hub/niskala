@@ -197,6 +197,9 @@ Deno.serve(async (req) => {
         ? body.redirect_to
         : (defaultSiteUrl ? `${defaultSiteUrl.replace(/\/+$/, '')}/auth/change-password` : AUTH_REDIRECT_URL)
 
+      const resendKey = Deno.env.get('RESEND_API_KEY') || ''
+      const hasResend = resendKey && !resendKey.startsWith('re_GANTI')
+
       // Cek apakah user sudah terdaftar di profiles
       const { data: existingProf } = await admin
         .from('profiles')
@@ -208,48 +211,67 @@ Deno.serve(async (req) => {
         if (!existingProf.must_change_password) {
           return json({ error: 'Pengguna dengan email ini sudah terdaftar dan akunnya aktif.' }, 400)
         }
-        // User belum ganti password, resend invite
-        const { error: resetErr } = await admin.auth.resetPasswordForEmail(email, { redirectTo })
-        if (resetErr) {
-          return json({ error: `Gagal mengirim ulang undangan: ${resetErr.message}` }, 400)
+        // Akun sudah dibuat: kirim token recovery baru yang cocok dengan type=recovery.
+        if (hasResend) {
+          const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
+            type: 'recovery',
+            email,
+            options: { redirectTo },
+          })
+          const hashedToken = linkData?.properties?.hashed_token
+          if (linkErr || !hashedToken) {
+            return json({ error: `Gagal membuat ulang undangan: ${linkErr?.message || 'Token tidak tersedia'}` }, 400)
+          }
+          const resendRes = await sendInviteEmail(
+            email,
+            buildPasswordLink(hashedToken, 'recovery'),
+            appName,
+          )
+          if (!resendRes.sent) {
+            return json({ error: `Gagal mengirim ulang undangan: ${resendRes.error}` }, 400)
+          }
+        } else {
+          const { error: resetErr } = await admin.auth.resetPasswordForEmail(email, { redirectTo })
+          if (resetErr) {
+            return json({ error: `Gagal mengirim ulang undangan: ${resetErr.message}` }, 400)
+          }
         }
         return json({ ok: true, user_id: existingProf.id, resent: true, email_sent: true })
       }
-
-      const resendKey = Deno.env.get('RESEND_API_KEY') || ''
-      const hasResend = resendKey && !resendKey.startsWith('re_GANTI')
 
       let userId: string | null = null
       let emailSent = false
       let emailError: string | null = null
 
-if (hasResend) {
-  // Gunakan type 'magiclink' untuk penukaran token OTP yang paling stabil di Supabase
-  const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
-    type: 'magiclink',
-    email,
-    options: { redirectTo },
-  })
+      if (hasResend) {
+        // Token harus dibuat dan diverifikasi dengan tipe yang sama.
+        const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
+          type: 'invite',
+          email,
+          options: { redirectTo },
+        })
 
-  if (linkErr || !linkData?.user) {
-    return json({ error: `Gagal membuat undangan: ${linkErr?.message || 'User tidak terbuat'}` }, 400)
-  }
+        if (linkErr || !linkData?.user) {
+          return json({ error: `Gagal membuat undangan: ${linkErr?.message || 'User tidak terbuat'}` }, 400)
+        }
 
-  userId = linkData.user.id
-  const hashedToken = linkData.properties?.hashed_token
+        userId = linkData.user.id
+        const hashedToken = linkData.properties?.hashed_token
+        if (!hashedToken) {
+          return json({ error: 'Gagal membuat undangan: token tidak tersedia' }, 400)
+        }
 
-  if (hashedToken) {
-    // Gunakan type=recovery agar verifyOtp di frontend mengenali token secara konsisten
-    const customInviteLink = `${redirectTo}?token_hash=${hashedToken}&type=recovery`
-    
-    const resendRes = await sendInviteEmail(email, customInviteLink, appName)
-    emailSent = resendRes.sent
-    emailError = resendRes.error
-    if (!emailSent) {
-      console.warn('Resend gagal:', emailError)
-    }
-  }
-} else {
+        const resendRes = await sendInviteEmail(
+          email,
+          buildPasswordLink(hashedToken, 'invite'),
+          appName,
+        )
+        emailSent = resendRes.sent
+        emailError = resendRes.error
+        if (!emailSent) {
+          return json({ error: `Gagal mengirim email undangan: ${emailError}` }, 400)
+        }
+      } else {
         // ── Mode B: Supabase Native SMTP ────────────────────────
         // inviteUserByEmail secara otomatis mengirim email via SMTP yang dikonfigurasi
         // di Supabase Dashboard (satu call = satu email, tanpa double-send).
@@ -360,23 +382,29 @@ const redirectTo = typeof body?.redirect_to === 'string' && body.redirect_to.tri
       let emailSent = false
       let emailError: string | null = null
 
-if (hasResend) {
-  const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
-    type: 'magiclink',
-    email: targetEmail,
-    options: { redirectTo },
-  })
+      if (hasResend) {
+        const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
+          type: 'recovery',
+          email: targetEmail,
+          options: { redirectTo },
+        })
 
-  const hashedToken = linkData?.properties?.hashed_token
-  if (hashedToken) {
-    const customInviteLink = `${redirectTo}?token_hash=${hashedToken}&type=recovery`
-    const resendRes = await sendInviteEmail(targetEmail, customInviteLink, appName)
-    emailSent = resendRes.sent
-    emailError = resendRes.error
-  } else {
-    emailError = linkErr?.message || 'Gagal membuat magic link'
-  }
-} else {
+        const hashedToken = linkData?.properties?.hashed_token
+        if (hashedToken) {
+          const resendRes = await sendInviteEmail(
+            targetEmail,
+            buildPasswordLink(hashedToken, 'recovery'),
+            appName,
+          )
+          emailSent = resendRes.sent
+          emailError = resendRes.error
+        } else {
+          emailError = linkErr?.message || 'Gagal membuat token undangan'
+        }
+        if (!emailSent) {
+          return json({ error: `Gagal mengirim email undangan: ${emailError}` }, 400)
+        }
+      } else {
         // ── Mode B: Supabase Native SMTP (satu call saja) ────────
         const { error: resetErr } = await admin.auth.resetPasswordForEmail(targetEmail, {
           redirectTo,

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -40,6 +40,7 @@ export default function ChangePassword() {
   const [busy, setBusy] = useState(false);
   const [verifyingLink, setVerifyingLink] = useState(false);
   const [urlError, setUrlError] = useState<{ title: string; description: string } | null>(null);
+  const verifiedTokenRef = useRef<string | null>(null);
 
   const { session, mustChangePassword, loading, refreshProfile } = useAuth();
   const nav = useNavigate();
@@ -50,7 +51,7 @@ export default function ChangePassword() {
   const tokenHash = search?.get("token_hash") ?? null;
   const emailType = search?.get("type");
 
-  const isTokenHashLink = !!tokenHash && (emailType === "recovery" || emailType === "invite" || emailType === "signup");
+  const isTokenHashLink = !!tokenHash && (emailType === "recovery" || emailType === "invite" || emailType === "signup" || emailType === "magiclink");
   const isRecoveryLink = isTokenHashLink || hash.includes("type=recovery") || hash.includes("access_token") || hash.includes("type=invite") || hash.includes("type=signup");
 
   // 1. Cek error bawaan URL hash
@@ -63,14 +64,14 @@ export default function ChangePassword() {
 
   // 2. Verifikasi Token Hash (TUNGGAL - TIDAK ADA DUPLIKASI)
   useEffect(() => {
-    if (!isTokenHashLink || !tokenHash) return;
+    if (!isTokenHashLink || !tokenHash || verifiedTokenRef.current === tokenHash) return;
 
     let active = true;
+    verifiedTokenRef.current = tokenHash;
     setVerifyingLink(true);
 
     const verifyToken = async () => {
-      // Map 'invite' atau 'signup' ke type yang diterima verifyOtp
-      const targetType = (emailType === "invite" ? "signup" : emailType) as "signup" | "recovery";
+      const targetType = emailType as "invite" | "signup" | "recovery" | "magiclink";
 
       const { error } = await supabase.auth.verifyOtp({
         token_hash: tokenHash,
@@ -85,9 +86,8 @@ export default function ChangePassword() {
           description: error.message,
         });
       } else {
-        // Hapus query params dari URL agar tidak terverifikasi ulang saat refresh
+        // Token OTP hanya boleh digunakan sekali. Bersihkan URL segera setelah berhasil.
         window.history.replaceState({}, document.title, window.location.pathname);
-        if (refreshProfile) await refreshProfile();
       }
       setVerifyingLink(false);
     };
@@ -95,7 +95,7 @@ export default function ChangePassword() {
     verifyToken();
 
     return () => { active = false; };
-  }, [emailType, isTokenHashLink, tokenHash, refreshProfile]);
+  }, [emailType, isTokenHashLink, tokenHash]);
 
   // 3. Listener perubahan Auth State dari Hash URL
   useEffect(() => {
@@ -134,11 +134,12 @@ export default function ChangePassword() {
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
 
-      if (session?.user) {
+      const { data: currentUser } = await supabase.auth.getUser();
+      if (currentUser.user) {
         await supabase
           .from("profiles")
           .update({ must_change_password: false })
-          .eq("id", session.user.id);
+          .eq("id", currentUser.user.id);
       }
 
       await refreshProfile();
