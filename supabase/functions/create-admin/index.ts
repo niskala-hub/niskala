@@ -195,7 +195,7 @@ Deno.serve(async (req) => {
       const defaultSiteUrl = Deno.env.get('APP_URL') || Deno.env.get('SITE_URL') || ''
       const redirectTo = typeof body?.redirect_to === 'string' && body.redirect_to.trim() !== ''
         ? body.redirect_to
-        : (defaultSiteUrl ? `${defaultSiteUrl.replace(/\/+$/, '')}/auth/change-password` : AUTH_REDIRECT_URL)
+        : (defaultSiteUrl ? `${defaultSiteUrl.replace(/\/+$/, '')}/auth/confirm-invite` : AUTH_REDIRECT_URL)
 
       const resendKey = Deno.env.get('RESEND_API_KEY') || ''
       const hasResend = resendKey && !resendKey.startsWith('re_GANTI')
@@ -374,7 +374,7 @@ const defaultSiteUrl = requestOrigin || Deno.env.get('APP_URL') || Deno.env.get(
 
 const redirectTo = typeof body?.redirect_to === 'string' && body.redirect_to.trim() !== ''
   ? body.redirect_to
-  : (defaultSiteUrl ? `${defaultSiteUrl.replace(/\/+$/, '')}/auth/change-password` : AUTH_REDIRECT_URL)
+  : (defaultSiteUrl ? `${defaultSiteUrl.replace(/\/+$/, '')}/auth/confirm-invite` : AUTH_REDIRECT_URL)
 
       const resendKey = Deno.env.get('RESEND_API_KEY') || ''
       const hasResend = resendKey && !resendKey.startsWith('re_GANTI')

@@ -49,7 +49,8 @@ const App = () => (
                 <Route path="/collections/lounge-sets" element={<LoungeSets />} />
               </Route>
               <Route path="/auth" element={<Auth />} />
-              <Route path="/auth/change-password" element={<ChangePassword />} />
+<Route path="/auth/change-password" element={<ChangePassword />} />
+              <Route path="/auth/confirm-invite" element={<ConfirmInvite />} />
               <Route path="/links" element={<LinkBio />} />
               <Route path="/admin" element={<AdminLayout />}>
                 <Route index element={<Dashboard />} />
