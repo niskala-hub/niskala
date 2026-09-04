@@ -25,6 +25,7 @@ import AdminAccounting from "./pages/admin/Accounting";
 import LinkBio from "./pages/LinkBio";
 import NotFound from "./pages/NotFound";
 import ChangePassword from "./pages/ChangePassword";
+import ConfirmInvite from "./pages/ConfirmInvite";
 
 const queryClient = new QueryClient();
 

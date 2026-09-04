@@ -1,6 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
-const AUTH_REDIRECT_URL = 'https://niskalawear.com/auth/change-password'
+const AUTH_REDIRECT_URL = 'https://niskalawear.com/auth/confirm-invite'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
