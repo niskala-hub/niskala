@@ -140,7 +140,7 @@ export default function Users() {
           email: inviteEmail,
           password: invitePassword,
           role: inviteRole,
-          redirect_to: "https://niskalawear.com/auth/change-password",
+          redirect_to: "https://niskalawear.com/auth/confirm-invite",
         },
       });
 
@@ -164,7 +164,7 @@ export default function Users() {
         body: {
           action: "resend_invite",
           user_id: u.id,
-          redirect_to: "https://niskalawear.com/auth/change-password",
+          redirect_to: "https://niskalawear.com/auth/confirm-invite",
         },
       });
 
