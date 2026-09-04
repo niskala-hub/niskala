@@ -68,7 +68,7 @@ export default function Auth() {
         body: {
           email,
           mode: forgotMode,
-          redirect_to: "https://niskalawear.com/auth/change-password",
+          redirect_to: "https://niskalawear.com/auth/confirm-invite",
         },
       });
 
