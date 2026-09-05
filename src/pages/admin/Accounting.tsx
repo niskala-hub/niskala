@@ -84,12 +84,38 @@ const emptyDraft: Draft = {
   receipt_url: "",
 };
 
+const CASH_TRANSACTIONS_PAGE_SIZE = 1000;
+
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString("id-ID", {
     day: "2-digit",
     month: "short",
     year: "numeric",
   });
+}
+
+async function loadAllCashTransactions() {
+  const transactions: CashTransaction[] = [];
+  let offset = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("cash_transactions")
+      .select("*")
+      .order("transaction_date", { ascending: false })
+      .order("created_at", { ascending: false })
+      .range(offset, offset + CASH_TRANSACTIONS_PAGE_SIZE - 1);
+
+    if (error) throw error;
+
+    const page = (data ?? []) as CashTransaction[];
+    transactions.push(...page);
+
+    if (page.length < CASH_TRANSACTIONS_PAGE_SIZE) break;
+    offset += CASH_TRANSACTIONS_PAGE_SIZE;
+  }
+
+  return transactions;
 }
 
 export default function Accounting() {
@@ -111,21 +137,18 @@ export default function Accounting() {
 
   const load = async () => {
     setLoading(true);
-    const [tx, orders] = await Promise.all([
-      supabase
-        .from("cash_transactions")
-        .select("*")
-        .order("transaction_date", { ascending: false })
-        .order("created_at", { ascending: false }),
+    const [transactionResult, orders] = await Promise.allSettled([
+      loadAllCashTransactions(),
       supabase.from("orders").select("total_price, total_hpp"),
     ]);
-    if (tx.error) {
-      toast({ title: "Gagal memuat transaksi", description: tx.error.message, variant: "destructive" });
+
+    if (transactionResult.status === "rejected") {
+      toast({ title: "Gagal memuat transaksi", description: transactionResult.reason?.message ?? String(transactionResult.reason), variant: "destructive" });
     } else {
-      setTransactions((tx.data ?? []) as CashTransaction[]);
+      setTransactions(transactionResult.value);
     }
-    if (!orders.error) {
-      const profit = (orders.data ?? []).reduce(
+    if (orders.status === "fulfilled" && !orders.value.error) {
+      const profit = (orders.value.data ?? []).reduce(
         (sum, o) => sum + (Number(o.total_price) - Number(o.total_hpp)),
         0
       );
@@ -274,8 +297,7 @@ export default function Accounting() {
   };
 
   const fileSlug = () =>
-    `buku-kas-niskala${filterFrom ? `-${filterFrom}` : ""}${filterTo ? `-${filterTo}` : ""}${
-      filterCategory !== "all" ? `-${filterCategory.toLowerCase().replace(/\s+/g, "-")}` : ""
+    `buku-kas-niskala${filterFrom ? `-${filterFrom}` : ""}${filterTo ? `-${filterTo}` : ""}${filterCategory !== "all" ? `-${filterCategory.toLowerCase().replace(/\s+/g, "-")}` : ""
     }`;
 
   const filteredTotals = useMemo(() => {
