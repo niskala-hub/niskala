@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Eye, EyeOff, ShieldCheck, AlertTriangle, Loader2, CheckCircle2 } from "lucide-react";
 
-type ViewState = "landing" | "resolving" | "password" | "expired";
+type Step = "activate" | "resolving" | "set_password" | "success" | "expired";
 type OtpType = "invite" | "signup" | "recovery" | "magiclink";
 
 const OTP_TYPES: OtpType[] = ["invite", "signup", "recovery", "magiclink"];
@@ -45,7 +45,7 @@ function clearAuthUrl() {
 }
 
 export default function ConfirmInvite() {
-  const [view, setView] = useState<ViewState>("landing");
+  const [step, setStep] = useState<Step>("activate");
   const [email, setEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -73,10 +73,10 @@ export default function ConfirmInvite() {
     });
 
     const acceptSession = (sessionEmail?: string) => {
-      if (!active || !sessionEmail) return;
+      if (!active || !activationStartedRef.current || !sessionEmail) return;
       setEmail(sessionEmail);
       setInlineError("");
-      setView("password");
+      setStep("set_password");
     };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -90,24 +90,6 @@ export default function ConfirmInvite() {
       }
     });
 
-    // This only reads a session the SDK may already have established. It does not
-    // manually exchange a PKCE code or consume a token_hash invitation.
-    supabase.auth.getSession().then(({ data, error }) => {
-      if (!active) return;
-      if (error) {
-        console.error("[ConfirmInvite] Initial session resolution error", error);
-        if (isInvalidOrExpiredToken(error)) setView("expired");
-        else setInlineError(getErrorMessage(error));
-        return;
-      }
-      acceptSession(data.session?.user?.email);
-    }).catch((error: unknown) => {
-      if (!active) return;
-      console.error("[ConfirmInvite] Initial session resolution threw", error);
-      if (isInvalidOrExpiredToken(error)) setView("expired");
-      else setInlineError(getErrorMessage(error));
-    });
-
     return () => {
       active = false;
       subscription.unsubscribe();
@@ -119,14 +101,14 @@ export default function ConfirmInvite() {
     activationStartedRef.current = true;
     setBusy(true);
     setInlineError("");
-    setView("resolving");
+    setStep("resolving");
 
     try {
       const urlError = getUrlAuthError();
       if (urlError) {
         console.error("[ConfirmInvite] Supabase URL auth error", urlError);
         if (isInvalidOrExpiredToken(urlError)) {
-          setView("expired");
+          setStep("expired");
           return;
         }
         throw new Error(urlError.message);
@@ -136,7 +118,7 @@ export default function ConfirmInvite() {
       if (sessionError) throw sessionError;
       if (sessionData.session?.user?.email) {
         setEmail(sessionData.session.user.email);
-        setView("password");
+        setStep("set_password");
         return;
       }
 
@@ -152,7 +134,7 @@ export default function ConfirmInvite() {
           throw new Error("Sesi akun belum tersedia. Silakan coba aktivasi sekali lagi.");
         }
         setEmail(data.session.user.email);
-        setView("password");
+        setStep("set_password");
         return;
       }
 
@@ -160,10 +142,10 @@ export default function ConfirmInvite() {
     } catch (error: unknown) {
       console.error("[ConfirmInvite] Account activation error", error);
       if (isInvalidOrExpiredToken(error)) {
-        setView("expired");
+        setStep("expired");
       } else {
         setInlineError(getErrorMessage(error));
-        setView("landing");
+        setStep("activate");
         activationStartedRef.current = false;
       }
     } finally {
@@ -196,11 +178,12 @@ export default function ConfirmInvite() {
       await refreshProfile();
       clearAuthUrl();
       toast({ title: "Akun berhasil diaktifkan!", description: "Anda akan diarahkan ke dashboard." });
+      setStep("success");
       setTimeout(() => nav("/dashboard", { replace: true }), 1200);
     } catch (error: unknown) {
       console.error("[ConfirmInvite] Password update error", error);
       if (isInvalidOrExpiredToken(error)) {
-        setView("expired");
+        setStep("expired");
       } else {
         const message = getErrorMessage(error);
         setInlineError(message);
@@ -211,7 +194,7 @@ export default function ConfirmInvite() {
     }
   };
 
-  if (view === "resolving") {
+  if (step === "resolving") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[hsl(var(--warm-bg))] px-4">
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
@@ -221,7 +204,7 @@ export default function ConfirmInvite() {
     );
   }
 
-  if (view === "expired") {
+  if (step === "expired") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[hsl(var(--warm-bg))] px-4 py-16">
         <div className="w-full max-w-md bg-background border border-border p-8 shadow-sm text-center">
@@ -236,14 +219,14 @@ export default function ConfirmInvite() {
             to="/auth"
             className="block w-full py-3 bg-primary text-primary-foreground text-sm font-medium text-center hover:opacity-90 transition-opacity"
           >
-            Ke Halaman Masuk
+            Request New Invite / Kembali ke Login
           </Link>
         </div>
       </div>
     );
   }
 
-  if (view === "landing") {
+  if (step === "activate") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[hsl(var(--warm-bg))] px-4 py-16">
         <div className="w-full max-w-md bg-background border border-border p-6 sm:p-8 shadow-sm text-center">
@@ -267,6 +250,16 @@ export default function ConfirmInvite() {
           <Link to="/auth" className="inline-block mt-5 text-sm text-muted-foreground hover:text-foreground transition-colors">
             Kembali ke halaman masuk
           </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === "success") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[hsl(var(--warm-bg))] px-4">
+        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+          <CheckCircle2 className="w-4 h-4 text-green-600" /> Akun berhasil diaktifkan. Mengarahkan ke dashboard…
         </div>
       </div>
     );
