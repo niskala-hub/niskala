@@ -1,30 +1,59 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
 import { Eye, EyeOff, ShieldCheck, AlertTriangle, Loader2, CheckCircle2 } from "lucide-react";
 
-function getAuthErrorFromUrl(): string | null {
-  if (typeof window === "undefined") return null;
+type ViewState = "landing" | "resolving" | "password" | "expired";
+type OtpType = "invite" | "signup" | "recovery" | "magiclink";
+
+const OTP_TYPES: OtpType[] = ["invite", "signup", "recovery", "magiclink"];
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "object" && error && "message" in error) {
+    return String(error.message);
+  }
+  return String(error || "Terjadi kesalahan autentikasi.");
+}
+
+function isInvalidOrExpiredToken(error: unknown): boolean {
+  const value = typeof error === "object" && error
+    ? `${"code" in error ? String(error.code) : ""} ${getErrorMessage(error)}`
+    : getErrorMessage(error);
+
+  return /otp_expired|expired|invalid.*(?:token|otp|link|jwt)|(?:token|otp|link|jwt).*invalid/i.test(value);
+}
+
+function getUrlAuthError(): { code: string; message: string } | null {
   const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
   const searchParams = new URLSearchParams(window.location.search);
-  const errorDesc = hashParams.get("error_description") || searchParams.get("error_description");
-  const errorCode = hashParams.get("error_code") || searchParams.get("error_code");
-  if (!errorDesc && !errorCode) return null;
-  return decodeURIComponent((errorDesc || errorCode || "").replace(/\+/g, " "));
+  const code = hashParams.get("error_code") || searchParams.get("error_code") || "";
+  const description = hashParams.get("error_description") || searchParams.get("error_description") || "";
+  if (!code && !description) return null;
+
+  return {
+    code,
+    message: decodeURIComponent((description || code).replace(/\+/g, " ")),
+  };
+}
+
+function clearAuthUrl() {
+  window.history.replaceState({}, document.title, window.location.pathname);
 }
 
 export default function ConfirmInvite() {
+  const [view, setView] = useState<ViewState>("landing");
   const [email, setEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [verifying, setVerifying] = useState(true);
-  const [linkExpired, setLinkExpired] = useState(false);
-  const verifiedRef = useRef<string | null>(null);
+  const [inlineError, setInlineError] = useState("");
+  const activationStartedRef = useRef(false);
 
   const { refreshProfile } = useAuth();
   const nav = useNavigate();
@@ -33,61 +62,114 @@ export default function ConfirmInvite() {
   useEffect(() => {
     let active = true;
 
-    const finish = (ok: boolean) => {
-      if (!active) return;
-      setLinkExpired(!ok);
-      setVerifying(false);
+    const searchParams = new URLSearchParams(window.location.search);
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    console.info("[ConfirmInvite] URL auth params", {
+      searchKeys: Array.from(searchParams.keys()),
+      hashKeys: Array.from(hashParams.keys()),
+      hasTokenHash: searchParams.has("token_hash"),
+      hasCode: searchParams.has("code"),
+      hasHashSession: hashParams.has("access_token"),
+    });
+
+    const acceptSession = (sessionEmail?: string) => {
+      if (!active || !sessionEmail) return;
+      setEmail(sessionEmail);
+      setInlineError("");
+      setView("password");
     };
 
-    const init = async () => {
-      // Error bawaan Supabase di URL (mis. otp_expired)
-      const urlErr = getAuthErrorFromUrl();
-      if (urlErr) return finish(false);
-
-      const search = new URLSearchParams(window.location.search);
-      const tokenHash = search.get("token_hash");
-      const type = search.get("type");
-
-      // 1. Link berbasis token_hash (dari edge function kami)
-      if (tokenHash && type) {
-        if (verifiedRef.current === tokenHash) return;
-        verifiedRef.current = tokenHash;
-        const { error } = await supabase.auth.verifyOtp({
-          token_hash: tokenHash,
-          type: type as "invite" | "signup" | "recovery" | "magiclink",
-        });
-        if (error) return finish(false);
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
-
-      // 2. Tunggu session aktif (verifyOtp, hash access_token, atau session tersimpan)
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user?.email) {
-        setEmail(session.user.email);
-        return finish(true);
-      }
-
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, sess) => {
-        if ((event === "SIGNED_IN" || event === "PASSWORD_RECOVERY" || event === "USER_UPDATED") && sess?.user?.email) {
-          setEmail(sess.user.email);
-          if (window.location.hash) {
-            window.history.replaceState({}, document.title, window.location.pathname);
-          }
-          finish(true);
-        }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.info("[ConfirmInvite] Auth state changed", {
+        event,
+        hasSession: Boolean(session),
+        hasUser: Boolean(session?.user),
       });
+      if (event === "SIGNED_IN" || event === "PASSWORD_RECOVERY" || event === "INITIAL_SESSION") {
+        acceptSession(session?.user?.email);
+      }
+    });
 
-      // Beri waktu client memproses hash URL; jika tetap tidak ada session → expired
-      setTimeout(async () => {
-        const { data: { session: s } } = await supabase.auth.getSession();
-        if (!s) finish(false);
-        subscription.unsubscribe();
-      }, 3000);
+    // This only reads a session the SDK may already have established. It does not
+    // manually exchange a PKCE code or consume a token_hash invitation.
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (!active) return;
+      if (error) {
+        console.error("[ConfirmInvite] Initial session resolution error", error);
+        if (isInvalidOrExpiredToken(error)) setView("expired");
+        else setInlineError(getErrorMessage(error));
+        return;
+      }
+      acceptSession(data.session?.user?.email);
+    }).catch((error: unknown) => {
+      if (!active) return;
+      console.error("[ConfirmInvite] Initial session resolution threw", error);
+      if (isInvalidOrExpiredToken(error)) setView("expired");
+      else setInlineError(getErrorMessage(error));
+    });
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
     };
-
-    init();
-    return () => { active = false; };
   }, []);
+
+  const handleActivate = async () => {
+    if (activationStartedRef.current) return;
+    activationStartedRef.current = true;
+    setBusy(true);
+    setInlineError("");
+    setView("resolving");
+
+    try {
+      const urlError = getUrlAuthError();
+      if (urlError) {
+        console.error("[ConfirmInvite] Supabase URL auth error", urlError);
+        if (isInvalidOrExpiredToken(urlError)) {
+          setView("expired");
+          return;
+        }
+        throw new Error(urlError.message);
+      }
+
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      if (sessionData.session?.user?.email) {
+        setEmail(sessionData.session.user.email);
+        setView("password");
+        return;
+      }
+
+      const params = new URLSearchParams(window.location.search);
+      const tokenHash = params.get("token_hash");
+      const rawType = params.get("type");
+      const type = OTP_TYPES.find(value => value === rawType);
+
+      if (tokenHash && type) {
+        const { data, error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
+        if (error) throw error;
+        if (!data.session?.user?.email) {
+          throw new Error("Sesi akun belum tersedia. Silakan coba aktivasi sekali lagi.");
+        }
+        setEmail(data.session.user.email);
+        setView("password");
+        return;
+      }
+
+      throw new Error("Sesi belum tersedia. Pastikan Anda membuka link lengkap dari email, lalu coba lagi.");
+    } catch (error: unknown) {
+      console.error("[ConfirmInvite] Account activation error", error);
+      if (isInvalidOrExpiredToken(error)) {
+        setView("expired");
+      } else {
+        setInlineError(getErrorMessage(error));
+        setView("landing");
+        activationStartedRef.current = false;
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const passwordTooShort = newPassword.length > 0 && newPassword.length < 8;
   const mismatch = confirm.length > 0 && confirm !== newPassword;
@@ -98,6 +180,7 @@ export default function ConfirmInvite() {
     if (!formValid) return;
 
     setBusy(true);
+    setInlineError("");
     try {
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
@@ -111,16 +194,24 @@ export default function ConfirmInvite() {
       }
 
       await refreshProfile();
+      clearAuthUrl();
       toast({ title: "Akun berhasil diaktifkan!", description: "Anda akan diarahkan ke dashboard." });
-      setTimeout(() => nav("/admin", { replace: true }), 1200);
-    } catch (err: any) {
-      toast({ title: "Gagal mengatur password", description: err.message, variant: "destructive" });
+      setTimeout(() => nav("/dashboard", { replace: true }), 1200);
+    } catch (error: unknown) {
+      console.error("[ConfirmInvite] Password update error", error);
+      if (isInvalidOrExpiredToken(error)) {
+        setView("expired");
+      } else {
+        const message = getErrorMessage(error);
+        setInlineError(message);
+        toast({ title: "Gagal mengatur password", description: message, variant: "destructive" });
+      }
     } finally {
       setBusy(false);
     }
   };
 
-  if (verifying) {
+  if (view === "resolving") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[hsl(var(--warm-bg))] px-4">
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
@@ -130,7 +221,7 @@ export default function ConfirmInvite() {
     );
   }
 
-  if (linkExpired) {
+  if (view === "expired") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[hsl(var(--warm-bg))] px-4 py-16">
         <div className="w-full max-w-md bg-background border border-border p-8 shadow-sm text-center">
@@ -146,6 +237,35 @@ export default function ConfirmInvite() {
             className="block w-full py-3 bg-primary text-primary-foreground text-sm font-medium text-center hover:opacity-90 transition-opacity"
           >
             Ke Halaman Masuk
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (view === "landing") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[hsl(var(--warm-bg))] px-4 py-16">
+        <div className="w-full max-w-md bg-background border border-border p-6 sm:p-8 shadow-sm text-center">
+          <div className="w-12 h-12 rounded-full bg-secondary border border-border flex items-center justify-center mx-auto mb-5">
+            <ShieldCheck className="w-6 h-6 text-primary" />
+          </div>
+          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-2">Undangan NISKALA</p>
+          <h1 className="text-2xl font-light text-foreground mb-3">Aktifkan Akun Anda</h1>
+          <p className="text-sm text-muted-foreground leading-relaxed mb-6">
+            Konfirmasikan aktivasi untuk melanjutkan dan membuat password akun Anda.
+          </p>
+          {inlineError && (
+            <p role="alert" className="mb-4 border border-destructive/30 bg-destructive/5 px-3 py-2 text-left text-sm text-destructive">
+              {inlineError}
+            </p>
+          )}
+          <Button type="button" className="w-full" onClick={handleActivate} disabled={busy}>
+            {busy && <Loader2 className="w-4 h-4 animate-spin" />}
+            Activate Account &amp; Set Password
+          </Button>
+          <Link to="/auth" className="inline-block mt-5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+            Kembali ke halaman masuk
           </Link>
         </div>
       </div>
@@ -233,14 +353,20 @@ export default function ConfirmInvite() {
               )}
             </div>
 
-            <button
+            {inlineError && (
+              <p role="alert" className="border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                {inlineError}
+              </p>
+            )}
+
+            <Button
               type="submit"
               disabled={busy || !formValid}
-              className="w-full py-3 bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 mt-2 flex items-center justify-center gap-2"
+              className="w-full mt-2"
             >
               {busy && <Loader2 className="w-4 h-4 animate-spin" />}
               {busy ? "Menyimpan…" : "Atur Password & Masuk Dashboard"}
-            </button>
+            </Button>
           </form>
         </div>
       </div>
