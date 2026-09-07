@@ -56,8 +56,6 @@ export default function ConfirmInvite() {
         setIsPkceCode(hasPkceCode);
 
         // Supabase email template example: ?token_hash={{ .TokenHash }}&type=invite
-        // Keep the token in state and remove it before any rerender or page refresh.
-        window.history.replaceState({}, document.title, window.location.pathname);
     }, []);
 
     const handleActivate = async () => {
@@ -94,6 +92,7 @@ export default function ConfirmInvite() {
 
             setEmail(userEmail);
             setFlowStep("SET_PASSWORD");
+            window.history.replaceState({}, document.title, window.location.pathname);
         } catch (error: unknown) {
             if (isExpiredError(error)) setFlowStep("EXPIRED");
             else {
