@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { AlertTriangle, CheckCircle2, Eye, EyeOff, Loader2, ShieldCheck } from "lucide-react";
 
 type FlowStep = "INITIAL_CONFIRM" | "SET_PASSWORD" | "SUCCESS" | "EXPIRED";
-type OtpType = "invite" | "email";
+type OtpType = "invite" | "email" | "recovery";
 
 function getErrorMessage(error: unknown): string {
     if (error instanceof Error) return error.message;
@@ -25,7 +25,11 @@ function getTokenFromUrl(): { token: string | null; type: OtpType; isPkceCode: b
     const tokenHash = searchParams.get("token_hash") ?? hashParams.get("token_hash");
     const token = tokenHash ?? searchParams.get("token") ?? hashParams.get("token");
     const code = searchParams.get("code") ?? hashParams.get("code");
-    const type = searchParams.get("type") === "email" || hashParams.get("type") === "email" ? "email" : "invite";
+
+    // Ambil type secara dinamis (invite | recovery | email)
+    const rawType = searchParams.get("type") ?? hashParams.get("type");
+    const type: OtpType = (rawType === "email" || rawType === "recovery") ? rawType : "invite";
+
     return { token: token ?? code, type, isPkceCode: !tokenHash && Boolean(code) };
 }
 
@@ -57,7 +61,14 @@ export default function ConfirmInvite() {
     }, []);
 
     const handleActivate = async () => {
-        if (!tokenHash || busy) {
+        if (!tokenHash && !isPkceCode) {
+            // Cek apakah Supabase SDK sudah sempat menukar session secara otomatis
+            const { data: existingSession } = await supabase.auth.getSession();
+            if (existingSession.session?.user?.email) {
+                setEmail(existingSession.session.user.email);
+                setFlowStep("SET_PASSWORD");
+                return;
+            }
             setFlowStep("EXPIRED");
             return;
         }
@@ -65,12 +76,22 @@ export default function ConfirmInvite() {
         setBusy(true);
         setInlineError("");
         try {
-            const { data, error } = isPkceCode
-                ? await supabase.auth.exchangeCodeForSession(tokenHash)
-                : await supabase.auth.verifyOtp({ token_hash: tokenHash, type: otpType });
-            if (error) throw error;
-            const userEmail = data.user?.email ?? data.session?.user?.email;
+            // 1. Cek dulu apakah session sudah terbentuk otomatis oleh SDK Client
+            const { data: currentSession } = await supabase.auth.getSession();
+            let userEmail = currentSession.session?.user?.email;
+
+            // 2. Jika belum ada session, baru lakukan verifikasi manual
+            if (!userEmail && tokenHash) {
+                const { data, error } = isPkceCode
+                    ? await supabase.auth.exchangeCodeForSession(tokenHash)
+                    : await supabase.auth.verifyOtp({ token_hash: tokenHash, type: otpType });
+
+                if (error) throw error;
+                userEmail = data.user?.email ?? data.session?.user?.email;
+            }
+
             if (!userEmail) throw new Error("Sesi akun belum tersedia. Silakan coba lagi.");
+
             setEmail(userEmail);
             setFlowStep("SET_PASSWORD");
         } catch (error: unknown) {
