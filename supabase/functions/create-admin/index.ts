@@ -130,6 +130,14 @@ async function sendInviteEmail(
   }
 }
 
+function buildPasswordLink(
+  tokenHash: string,
+  type: "invite" | "recovery",
+): string {
+  const params = new URLSearchParams({ token_hash: tokenHash, type });
+  return `${AUTH_REDIRECT_URL}?${params.toString()}`;
+}
+
 // ── Main Handler ────────────────────────────────────────────────────
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS")
@@ -236,16 +244,20 @@ Deno.serve(async (req) => {
               email,
               options: { redirectTo },
             });
-          const actionLink = linkData?.properties?.action_link;
-          if (linkErr || !actionLink) {
+          const tokenHash = linkData?.properties?.hashed_token;
+          if (linkErr || !tokenHash) {
             return json(
               {
-                error: `Gagal membuat ulang undangan: ${linkErr?.message || "Link tidak tersedia"}`,
+                error: `Gagal membuat ulang undangan: ${linkErr?.message || "Token tidak tersedia"}`,
               },
               400,
             );
           }
-          const resendRes = await sendInviteEmail(email, actionLink, appName);
+          const resendRes = await sendInviteEmail(
+            email,
+            buildPasswordLink(tokenHash, "invite"),
+            appName,
+          );
           if (!resendRes.sent) {
             return json(
               { error: `Gagal mengirim ulang undangan: ${resendRes.error}` },
@@ -277,6 +289,7 @@ Deno.serve(async (req) => {
       let emailError: string | null = null;
 
       if (hasResend) {
+        // Token harus dibuat dan diverifikasi dengan tipe yang sama.
         const { data: linkData, error: linkErr } =
           await admin.auth.admin.generateLink({
             type: "invite",
@@ -294,15 +307,19 @@ Deno.serve(async (req) => {
         }
 
         userId = linkData.user.id;
-        const actionLink = linkData.properties?.action_link;
-        if (!actionLink) {
+        const tokenHash = linkData.properties?.hashed_token;
+        if (!tokenHash) {
           return json(
-            { error: "Gagal membuat undangan: link tidak tersedia" },
+            { error: "Gagal membuat undangan: token tidak tersedia" },
             400,
           );
         }
 
-        const resendRes = await sendInviteEmail(email, actionLink, appName);
+        const resendRes = await sendInviteEmail(
+          email,
+          buildPasswordLink(tokenHash, "invite"),
+          appName,
+        );
         emailSent = resendRes.sent;
         emailError = resendRes.error;
         if (!emailSent) {
@@ -313,6 +330,8 @@ Deno.serve(async (req) => {
         }
       } else {
         // ── Mode B: Supabase Native SMTP ────────────────────────
+        // inviteUserByEmail secara otomatis mengirim email via SMTP yang dikonfigurasi
+        // di Supabase Dashboard (satu call = satu email, tanpa double-send).
         const { data: inviteData, error: inviteErr } =
           await admin.auth.admin.inviteUserByEmail(email, {
             redirectTo,
@@ -429,6 +448,7 @@ Deno.serve(async (req) => {
       }
 
       const appName = Deno.env.get("APP_NAME") || "NISKALA";
+      // Ambil origin pengakses (misal: http://localhost:8080 atau https://niskalawear.com)
       const requestOrigin = req.headers.get("origin") || "";
 
       const defaultSiteUrl =
@@ -458,18 +478,18 @@ Deno.serve(async (req) => {
             options: { redirectTo },
           });
 
-        const actionLink = linkData?.properties?.action_link;
+        const tokenHash = linkData?.properties?.hashed_token;
 
-        if (actionLink) {
+        if (tokenHash) {
           const resendRes = await sendInviteEmail(
             targetEmail,
-            actionLink,
+            buildPasswordLink(tokenHash, "invite"),
             appName,
           );
           emailSent = resendRes.sent;
           emailError = resendRes.error;
         } else {
-          emailError = linkErr?.message || "Gagal membuat link undangan";
+          emailError = linkErr?.message || "Gagal membuat token undangan";
         }
         if (!emailSent) {
           return json(
