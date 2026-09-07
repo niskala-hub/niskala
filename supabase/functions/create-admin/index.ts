@@ -8,6 +8,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+// ── Kirim email via Resend API ──────────────────────────────────────
 async function sendInviteEmail(
   email: string,
   inviteLink: string,
@@ -33,6 +34,7 @@ async function sendInviteEmail(
     <tr>
       <td align="center">
         <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border:1px solid #e5e5e5;">
+          <!-- Header -->
           <tr>
             <td style="padding:40px 40px 24px;border-bottom:1px solid #f0f0f0;">
               <p style="margin:0;font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#888;font-weight:500;">
@@ -43,16 +45,22 @@ async function sendInviteEmail(
               </h1>
             </td>
           </tr>
+          <!-- Body -->
           <tr>
             <td style="padding:32px 40px;">
-              <p style="margin:0 0 16px;font-size:14px;color:#444;line-height:1.6;">Halo,</p>
+              <p style="margin:0 0 16px;font-size:14px;color:#444;line-height:1.6;">
+                Halo,
+              </p>
               <p style="margin:0 0 16px;font-size:14px;color:#444;line-height:1.6;">
                 Anda telah diundang untuk bergabung sebagai administrator di <strong>${senderName}</strong>.
                 Klik tombol di bawah untuk mengatur password dan mengakses dashboard.
               </p>
-              <p style="margin:0 0 8px;font-size:12px;color:#888;">Link ini berlaku selama 24 jam.</p>
+              <p style="margin:0 0 8px;font-size:12px;color:#888;">
+                Link ini berlaku selama 24 jam.
+              </p>
             </td>
           </tr>
+          <!-- CTA -->
           <tr>
             <td style="padding:0 40px 32px;">
               <a href="${inviteLink}"
@@ -61,6 +69,7 @@ async function sendInviteEmail(
               </a>
             </td>
           </tr>
+          <!-- Link fallback -->
           <tr>
             <td style="padding:0 40px 32px;border-top:1px solid #f0f0f0;">
               <p style="margin:24px 0 8px;font-size:12px;color:#888;line-height:1.6;">
@@ -71,6 +80,7 @@ async function sendInviteEmail(
               </p>
             </td>
           </tr>
+          <!-- Footer -->
           <tr>
             <td style="padding:20px 40px;background:#fafafa;border-top:1px solid #f0f0f0;">
               <p style="margin:0;font-size:11px;color:#bbb;line-height:1.6;">
@@ -84,6 +94,13 @@ async function sendInviteEmail(
   </table>
 </body>
 </html>`;
+
+  if (!resendKey || resendKey.startsWith("re_GANTI")) {
+    return {
+      sent: false,
+      error: "RESEND_API_KEY tidak dikonfigurasi atau masih placeholder",
+    };
+  }
 
   try {
     const res = await fetch("https://api.resend.com/emails", {
@@ -101,7 +118,9 @@ async function sendInviteEmail(
     });
 
     const result = await res.json();
-    if (res.ok) return { sent: true, error: null };
+    if (res.ok) {
+      return { sent: true, error: null };
+    }
     return {
       sent: false,
       error: result?.message || `Resend error: ${res.status}`,
@@ -111,6 +130,7 @@ async function sendInviteEmail(
   }
 }
 
+// ── Main Handler ────────────────────────────────────────────────────
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS")
     return new Response("ok", { headers: corsHeaders });
@@ -131,10 +151,13 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
+    // Verify caller identity
     const { data: userData, error: userErr } = await admin.auth.getUser(token);
     if (userErr || !userData?.user) return json({ error: "Unauthorized" }, 401);
 
     const callerId = userData.user.id;
+
+    // Check if caller is owner or co_owner
     const { data: callerRoles } = await admin
       .from("user_roles")
       .select("role")
@@ -143,8 +166,9 @@ Deno.serve(async (req) => {
     const roles = (callerRoles || []).map((r: any) => r.role as string);
     const isOwner = roles.includes("owner");
     const isCoOwner = roles.includes("co_owner");
+    const canManage = isOwner || isCoOwner;
 
-    if (!isOwner && !isCoOwner) {
+    if (!canManage) {
       return json(
         { error: "Hanya owner atau co-owner yang bisa mengundang pengguna" },
         403,
@@ -154,60 +178,105 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => null);
     const action = body?.action ?? "invite";
 
-    const requestOrigin = req.headers.get("origin") || "";
-    const defaultSiteUrl =
-      requestOrigin ||
-      Deno.env.get("APP_URL") ||
-      Deno.env.get("SITE_URL") ||
-      "";
-    const redirectTo =
-      typeof body?.redirect_to === "string" && body.redirect_to.trim() !== ""
-        ? body.redirect_to
-        : defaultSiteUrl
-          ? `${defaultSiteUrl.replace(/\/+$/, "")}/auth/confirm-invite`
-          : AUTH_REDIRECT_URL;
-
-    const resendKey = Deno.env.get("RESEND_API_KEY") || "";
-    const hasResend = resendKey && !resendKey.startsWith("re_GANTI");
-    const appName = Deno.env.get("APP_NAME") || "NISKALA";
-
     // ── ACTION: invite ──────────────────────────────────────────
     if (action === "invite") {
       const email =
         typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
       const password = typeof body?.password === "string" ? body.password : "";
       const role = typeof body?.role === "string" ? body.role : "admin";
+      const appName = Deno.env.get("APP_NAME") || "NISKALA";
 
-      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || email.length > 255) {
         return json({ error: "Email tidak valid" }, 400);
+      }
+      if (password && (password.length < 8 || password.length > 72)) {
+        return json({ error: "Password minimal 8 karakter" }, 400);
+      }
 
+      // Co-owner cannot create co_owner or owner roles
       const allowedRoles = isOwner ? ["admin", "co_owner"] : ["admin"];
       if (!allowedRoles.includes(role)) {
         return json({ error: `Co-owner tidak bisa membuat role ${role}` }, 403);
       }
 
+      const defaultSiteUrl =
+        Deno.env.get("APP_URL") || Deno.env.get("SITE_URL") || "";
+      const redirectTo =
+        typeof body?.redirect_to === "string" && body.redirect_to.trim() !== ""
+          ? body.redirect_to
+          : defaultSiteUrl
+            ? `${defaultSiteUrl.replace(/\/+$/, "")}/auth/confirm-invite`
+            : AUTH_REDIRECT_URL;
+
+      const resendKey = Deno.env.get("RESEND_API_KEY") || "";
+      const hasResend = resendKey && !resendKey.startsWith("re_GANTI");
+
+      // Cek apakah user sudah terdaftar di profiles
       const { data: existingProf } = await admin
         .from("profiles")
         .select("id, must_change_password")
         .eq("email", email)
         .maybeSingle();
 
-      if (existingProf && !existingProf.must_change_password) {
-        return json(
-          {
-            error:
-              "Pengguna dengan email ini sudah terdaftar dan akunnya aktif.",
-          },
-          400,
-        );
+      if (existingProf) {
+        if (!existingProf.must_change_password) {
+          return json(
+            {
+              error:
+                "Pengguna dengan email ini sudah terdaftar dan akunnya aktif.",
+            },
+            400,
+          );
+        }
+        // Akun sudah dibuat: kirim token undangan baru untuk aktivasi akun.
+        if (hasResend) {
+          const { data: linkData, error: linkErr } =
+            await admin.auth.admin.generateLink({
+              type: "invite",
+              email,
+              options: { redirectTo },
+            });
+          const actionLink = linkData?.properties?.action_link;
+          if (linkErr || !actionLink) {
+            return json(
+              {
+                error: `Gagal membuat ulang undangan: ${linkErr?.message || "Link tidak tersedia"}`,
+              },
+              400,
+            );
+          }
+          const resendRes = await sendInviteEmail(email, actionLink, appName);
+          if (!resendRes.sent) {
+            return json(
+              { error: `Gagal mengirim ulang undangan: ${resendRes.error}` },
+              400,
+            );
+          }
+        } else {
+          const { error: resetErr } = await admin.auth.resetPasswordForEmail(
+            email,
+            { redirectTo },
+          );
+          if (resetErr) {
+            return json(
+              { error: `Gagal mengirim ulang undangan: ${resetErr.message}` },
+              400,
+            );
+          }
+        }
+        return json({
+          ok: true,
+          user_id: existingProf.id,
+          resent: true,
+          email_sent: true,
+        });
       }
 
-      let userId: string | null = existingProf?.id || null;
+      let userId: string | null = null;
       let emailSent = false;
       let emailError: string | null = null;
 
       if (hasResend) {
-        // Gunakan generateLink dengan type "invite"
         const { data: linkData, error: linkErr } =
           await admin.auth.admin.generateLink({
             type: "invite",
@@ -215,46 +284,71 @@ Deno.serve(async (req) => {
             options: { redirectTo },
           });
 
-        if (linkErr || !linkData?.properties?.action_link) {
+        if (linkErr || !linkData?.user) {
           return json(
             {
-              error: `Gagal membuat undangan: ${linkErr?.message || "Link tidak terbuat"}`,
+              error: `Gagal membuat undangan: ${linkErr?.message || "User tidak terbuat"}`,
             },
             400,
           );
         }
 
         userId = linkData.user.id;
-        // ✅ GUNAKAN action_link BAWAAN SUPABASE (Sudah Include Token & Redirect URL Aman)
-        const actionLink = linkData.properties.action_link;
+        const actionLink = linkData.properties?.action_link;
+        if (!actionLink) {
+          return json(
+            { error: "Gagal membuat undangan: link tidak tersedia" },
+            400,
+          );
+        }
 
         const resendRes = await sendInviteEmail(email, actionLink, appName);
         emailSent = resendRes.sent;
         emailError = resendRes.error;
+        if (!emailSent) {
+          return json(
+            { error: `Gagal mengirim email undangan: ${emailError}` },
+            400,
+          );
+        }
       } else {
+        // ── Mode B: Supabase Native SMTP ────────────────────────
         const { data: inviteData, error: inviteErr } =
-          await admin.auth.admin.inviteUserByEmail(email, { redirectTo });
-        if (inviteErr)
+          await admin.auth.admin.inviteUserByEmail(email, {
+            redirectTo,
+          });
+
+        if (inviteErr) {
           return json(
             { error: `Gagal mengirim undangan email: ${inviteErr.message}` },
             400,
           );
+        }
+
         userId = inviteData.user.id;
         emailSent = true;
       }
 
-      if (password && userId) {
+      if (!userId) {
+        return json({ error: "Gagal mendaftarkan pengguna" }, 400);
+      }
+
+      // Update password default jika disediakan
+      if (password) {
         await admin.auth.admin.updateUserById(userId, { password });
       }
 
-      if (userId) {
-        await admin
-          .from("profiles")
-          .upsert({ id: userId, email, must_change_password: true });
-        await admin
-          .from("user_roles")
-          .upsert({ user_id: userId, role }, { onConflict: "user_id,role" });
-      }
+      // Upsert profile
+      await admin.from("profiles").upsert({
+        id: userId,
+        email,
+        must_change_password: true,
+      });
+
+      // Assign role
+      await admin
+        .from("user_roles")
+        .upsert({ user_id: userId, role }, { onConflict: "user_id,role" });
 
       return json({
         ok: true,
@@ -271,17 +365,90 @@ Deno.serve(async (req) => {
       let targetEmail =
         typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
 
-      if (targetUserId) {
-        const { data: prof } = await admin
-          .from("profiles")
-          .select("email")
-          .eq("id", targetUserId)
-          .maybeSingle();
-        if (prof) targetEmail = prof.email;
+      if (!targetUserId && !targetEmail) {
+        return json({ error: "user_id atau email diperlukan" }, 400);
       }
 
-      if (!targetEmail)
+      let userId = targetUserId;
+      if (userId) {
+        const { data: prof, error: profErr } = await admin
+          .from("profiles")
+          .select("id, email, must_change_password")
+          .eq("id", userId)
+          .maybeSingle();
+
+        if (profErr || !prof) {
+          return json({ error: "Pengguna tidak ditemukan" }, 404);
+        }
+        targetEmail = prof.email || targetEmail;
+      } else if (targetEmail) {
+        const { data: prof } = await admin
+          .from("profiles")
+          .select("id, email, must_change_password")
+          .eq("email", targetEmail)
+          .maybeSingle();
+
+        if (prof) {
+          userId = prof.id;
+        }
+      }
+
+      if (!targetEmail) {
         return json({ error: "Email pengguna tidak ditemukan" }, 404);
+      }
+
+      // Check role permissions: Co-owner cannot resend for owner or another co-owner
+      if (userId && !isOwner) {
+        const { data: targetRoles } = await admin
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", userId);
+        const targetRoleNames = (targetRoles || []).map(
+          (r: any) => r.role as string,
+        );
+        if (
+          targetRoleNames.includes("owner") ||
+          targetRoleNames.includes("co_owner")
+        ) {
+          return json(
+            {
+              error:
+                "Co-owner tidak bisa mengirim ulang undangan untuk owner atau co-owner lain",
+            },
+            403,
+          );
+        }
+      }
+
+      // Ensure must_change_password is true
+      if (userId) {
+        await admin
+          .from("profiles")
+          .update({ must_change_password: true })
+          .eq("id", userId);
+      }
+
+      const appName = Deno.env.get("APP_NAME") || "NISKALA";
+      const requestOrigin = req.headers.get("origin") || "";
+
+      const defaultSiteUrl =
+        requestOrigin ||
+        Deno.env.get("APP_URL") ||
+        Deno.env.get("SITE_URL") ||
+        "";
+
+      const redirectTo =
+        typeof body?.redirect_to === "string" && body.redirect_to.trim() !== ""
+          ? body.redirect_to
+          : defaultSiteUrl
+            ? `${defaultSiteUrl.replace(/\/+$/, "")}/auth/confirm-invite`
+            : AUTH_REDIRECT_URL;
+
+      const resendKey = Deno.env.get("RESEND_API_KEY") || "";
+      const hasResend = resendKey && !resendKey.startsWith("re_GANTI");
+
+      let emailSent = false;
+      let emailError: string | null = null;
 
       if (hasResend) {
         const { data: linkData, error: linkErr } =
@@ -291,24 +458,177 @@ Deno.serve(async (req) => {
             options: { redirectTo },
           });
 
-        if (linkErr || !linkData?.properties?.action_link) {
+        const actionLink = linkData?.properties?.action_link;
+
+        if (actionLink) {
+          const resendRes = await sendInviteEmail(
+            targetEmail,
+            actionLink,
+            appName,
+          );
+          emailSent = resendRes.sent;
+          emailError = resendRes.error;
+        } else {
+          emailError = linkErr?.message || "Gagal membuat link undangan";
+        }
+        if (!emailSent) {
           return json(
-            { error: `Gagal mengirim ulang undangan: ${linkErr?.message}` },
+            { error: `Gagal mengirim email undangan: ${emailError}` },
             400,
           );
         }
-
-        const resendRes = await sendInviteEmail(
-          targetEmail,
-          linkData.properties.action_link,
-          appName,
-        );
-        if (!resendRes.sent) return json({ error: resendRes.error }, 400);
       } else {
-        await admin.auth.resetPasswordForEmail(targetEmail, { redirectTo });
+        // ── Mode B: Supabase Native SMTP (satu call saja) ────────
+        const { error: resetErr } = await admin.auth.resetPasswordForEmail(
+          targetEmail,
+          {
+            redirectTo,
+          },
+        );
+        if (resetErr) {
+          return json(
+            { error: `Gagal mengirim email undangan: ${resetErr.message}` },
+            400,
+          );
+        }
+        emailSent = true;
       }
 
-      return json({ ok: true, email_sent: true });
+      return json({ ok: true, email_sent: emailSent, email_error: emailError });
+    }
+
+    // ── ACTION: resolve_reset_request ───────────────────────────
+    if (action === "resolve_reset_request") {
+      const requestId =
+        typeof body?.request_id === "string" ? body.request_id : "";
+      if (!requestId) return json({ error: "request_id diperlukan" }, 400);
+
+      const { error } = await admin
+        .from("password_reset_requests")
+        .update({
+          status: "resolved",
+          handled_by: callerId,
+          handled_at: new Date().toISOString(),
+        })
+        .eq("id", requestId);
+      if (error) return json({ error: error.message }, 400);
+      return json({ ok: true });
+    }
+
+    // ── ACTION: reset_password ──────────────────────────────────
+    if (action === "reset_password") {
+      const targetUserId =
+        typeof body?.user_id === "string" ? body.user_id : "";
+      const newPassword =
+        typeof body?.new_password === "string" ? body.new_password : "";
+
+      if (!targetUserId) return json({ error: "user_id diperlukan" }, 400);
+      if (newPassword.length < 8 || newPassword.length > 72) {
+        return json({ error: "Password minimal 8 karakter" }, 400);
+      }
+
+      // Prevent co_owner from resetting owner's password
+      if (!isOwner) {
+        const { data: targetRoles } = await admin
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", targetUserId);
+        const targetRoleNames = (targetRoles || []).map(
+          (r: any) => r.role as string,
+        );
+        if (
+          targetRoleNames.includes("owner") ||
+          targetRoleNames.includes("co_owner")
+        ) {
+          return json(
+            {
+              error:
+                "Co-owner tidak bisa mereset password owner atau co-owner lain",
+            },
+            403,
+          );
+        }
+      }
+
+      const { error: updateErr } = await admin.auth.admin.updateUserById(
+        targetUserId,
+        {
+          password: newPassword,
+        },
+      );
+      if (updateErr) return json({ error: updateErr.message }, 400);
+
+      // Mark must_change_password = true
+      await admin
+        .from("profiles")
+        .update({ must_change_password: true })
+        .eq("id", targetUserId);
+
+      // Close any pending reset requests for this user
+      await admin
+        .from("password_reset_requests")
+        .update({
+          status: "resolved",
+          handled_by: callerId,
+          handled_at: new Date().toISOString(),
+        })
+        .eq("user_id", targetUserId)
+        .eq("status", "pending");
+
+      return json({ ok: true });
+    }
+
+    // ── ACTION: delete_user ─────────────────────────────────────
+    if (action === "delete_user") {
+      const targetUserId =
+        typeof body?.user_id === "string" ? body.user_id : "";
+      if (!targetUserId) return json({ error: "user_id diperlukan" }, 400);
+
+      // Get target roles
+      const { data: targetRoles } = await admin
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", targetUserId);
+      const targetRoleNames = (targetRoles || []).map(
+        (r: any) => r.role as string,
+      );
+
+      // Cannot delete yourself
+      if (targetUserId === callerId) {
+        return json({ error: "Tidak bisa menghapus akun sendiri" }, 403);
+      }
+
+      // Co-owner cannot delete owner or other co-owners
+      if (!isOwner) {
+        if (
+          targetRoleNames.includes("owner") ||
+          targetRoleNames.includes("co_owner")
+        ) {
+          return json(
+            { error: "Co-owner tidak bisa menghapus owner atau co-owner lain" },
+            403,
+          );
+        }
+      }
+
+      // Owner cannot delete other owners
+      if (
+        isOwner &&
+        targetRoleNames.includes("owner") &&
+        targetUserId !== callerId
+      ) {
+        return json({ error: "Owner tidak bisa menghapus owner lain" }, 403);
+      }
+
+      // Clean up relations first before deleting user from auth
+      await admin.from("user_roles").delete().eq("user_id", targetUserId);
+      await admin.from("profiles").delete().eq("id", targetUserId);
+
+      const { error: deleteErr } =
+        await admin.auth.admin.deleteUser(targetUserId);
+      if (deleteErr) return json({ error: deleteErr.message }, 400);
+
+      return json({ ok: true });
     }
 
     return json({ error: "Action tidak dikenal" }, 400);
