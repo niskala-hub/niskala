@@ -55,34 +55,51 @@ export default function ConfirmInvite() {
         setOtpType(type);
         setIsPkceCode(hasPkceCode);
 
-        // Supabase email template example: ?token_hash={{ .TokenHash }}&type=invite
+        // ── KRITIS: Hapus token dari URL SEGERA setelah dibaca.
+        // Ini mencegah:
+        // (1) Token terbaca lagi jika user refresh halaman setelah gagal verifikasi
+        // (2) Token tersisa di browser history
+        // (3) Apapun yang bisa membaca URL setelah render pertama
+        if (token || window.location.search || window.location.hash) {
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    }, []);
+
+    // Listener: tangkap jika Supabase SDK auto-sign-in dari hash (safety net)
+    useEffect(() => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            // Jika SDK auto-detect session dari hash fragment (misal invite flow)
+            if ((event === "SIGNED_IN" || event === "USER_UPDATED") && session?.user?.email) {
+                if (flowStep === "INITIAL_CONFIRM" || flowStep === "SET_PASSWORD") {
+                    setEmail(session.user.email);
+                    setFlowStep("SET_PASSWORD");
+                }
+            }
+        });
+        return () => subscription.unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const handleActivate = async () => {
-        if (!tokenHash && !isPkceCode) {
-            // Cek apakah Supabase SDK sudah sempat menukar session secara otomatis
-            const { data: existingSession } = await supabase.auth.getSession();
-            if (existingSession.session?.user?.email) {
-                setEmail(existingSession.session.user.email);
-                setFlowStep("SET_PASSWORD");
-                return;
-            }
-            setFlowStep("EXPIRED");
-            return;
-        }
-
         setBusy(true);
         setInlineError("");
         try {
-            // 1. Cek dulu apakah session sudah terbentuk otomatis oleh SDK Client
+            // 1. Cek dulu apakah session sudah terbentuk otomatis oleh SDK
+            //    (bisa terjadi jika Supabase detectSessionInUrl aktif atau dari onAuthStateChange)
             const { data: currentSession } = await supabase.auth.getSession();
             let userEmail = currentSession.session?.user?.email;
 
-            // 2. Jika belum ada session, baru lakukan verifikasi manual
-            if (!userEmail && tokenHash) {
+            // 2. Jika belum ada session & ada token, lakukan verifikasi manual
+            if (!userEmail) {
+                if (!tokenHash && !isPkceCode) {
+                    // Tidak ada token di URL dan tidak ada session — undangan sudah tidak valid
+                    setFlowStep("EXPIRED");
+                    return;
+                }
+
                 const { data, error } = isPkceCode
-                    ? await supabase.auth.exchangeCodeForSession(tokenHash)
-                    : await supabase.auth.verifyOtp({ token_hash: tokenHash, type: otpType });
+                    ? await supabase.auth.exchangeCodeForSession(tokenHash!)
+                    : await supabase.auth.verifyOtp({ token_hash: tokenHash!, type: otpType });
 
                 if (error) throw error;
                 userEmail = data.user?.email ?? data.session?.user?.email;
@@ -92,7 +109,6 @@ export default function ConfirmInvite() {
 
             setEmail(userEmail);
             setFlowStep("SET_PASSWORD");
-            window.history.replaceState({}, document.title, window.location.pathname);
         } catch (error: unknown) {
             if (isExpiredError(error)) setFlowStep("EXPIRED");
             else {
@@ -138,8 +154,18 @@ export default function ConfirmInvite() {
     if (flowStep === "EXPIRED") {
         return <PageShell><div className="w-full max-w-md bg-background border border-border p-8 shadow-sm text-center">
             <div className="w-12 h-12 rounded-full bg-red-50 border border-red-200 flex items-center justify-center mx-auto mb-4"><AlertTriangle className="w-6 h-6 text-red-600" /></div>
-            <h1 className="text-xl font-light text-foreground mb-2">Invitation Link Expired or Invalid</h1>
-            <p className="text-sm text-muted-foreground leading-relaxed mb-6">Link undangan ini sudah tidak berlaku. Silakan minta admin mengirimkan undangan baru.</p>
+            <h1 className="text-xl font-light text-foreground mb-2">Link Undangan Tidak Valid</h1>
+            <p className="text-sm text-muted-foreground leading-relaxed mb-4">
+                Link undangan ini sudah tidak dapat digunakan. Ini bisa terjadi karena:
+            </p>
+            <div className="bg-amber-50 border border-amber-200 p-4 text-left mb-6 text-xs text-amber-900 leading-relaxed space-y-1.5">
+                <p className="font-semibold mb-2">Kemungkinan penyebab:</p>
+                <p>• Link hanya berlaku satu kali dan sudah pernah digunakan</p>
+                <p>• Link sudah kadaluarsa (berlaku 24 jam)</p>
+                <p>• Admin mengirimkan undangan baru (link lama otomatis tidak valid)</p>
+                <p className="font-semibold mt-3 mb-1">Solusi:</p>
+                <p>Minta owner/admin untuk menekan tombol <strong>"Resend Invitation"</strong> di halaman kelola pengguna.</p>
+            </div>
             <Link to="/auth" className="block w-full py-3 bg-primary text-primary-foreground text-sm font-medium text-center hover:opacity-90 transition-opacity">Return to Login</Link>
         </div></PageShell>;
     }

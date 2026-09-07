@@ -6,7 +6,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function getAppUrl(): string {
-  const envUrl = import.meta.env.VITE_APP_URL;
+  const envUrl = import.meta.env.VITE_;
   if (envUrl && typeof envUrl === 'string' && envUrl.trim() !== '') {
     return envUrl.trim().replace(/\/+$/, '');
   }

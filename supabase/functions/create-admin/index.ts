@@ -134,8 +134,11 @@ function buildPasswordLink(
   tokenHash: string,
   type: "invite" | "recovery",
 ): string {
+  // IMPORTANT: Gunakan hash fragment (#) bukan query string (?).
+  // Hash fragment TIDAK dikirim ke server saat HTTP GET request,
+  // sehingga Google/Gmail pre-fetcher tidak bisa membaca atau meng-consume token ini.
   const params = new URLSearchParams({ token_hash: tokenHash, type });
-  return `${AUTH_REDIRECT_URL}?${params.toString()}`;
+  return `${AUTH_REDIRECT_URL}#${params.toString()}`;
 }
 
 // ── Main Handler ────────────────────────────────────────────────────
