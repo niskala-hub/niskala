@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Navigate } from "react-router-dom";
 import {
-  Plus, Trash2, X, Crown, ShieldCheck, ShieldHalf, KeyRound, Eye, EyeOff, RefreshCw, Send,
+  Plus, Trash2, X, Crown, ShieldCheck, ShieldHalf, KeyRound, RefreshCw, Send,
 } from "lucide-react";
 
 type RoleType = "owner" | "co_owner" | "admin";
@@ -52,8 +52,6 @@ export default function Users() {
   // Invite form state
   const [openInvite, setOpenInvite] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
-  const [invitePassword, setInvitePassword] = useState("");
-  const [showInvitePass, setShowInvitePass] = useState(false);
   const [inviteRole, setInviteRole] = useState<"admin" | "co_owner">("admin");
 
   // Reset password form state
@@ -138,7 +136,6 @@ export default function Users() {
         body: {
           action: "invite",
           email: inviteEmail,
-          password: invitePassword,
           role: inviteRole,
           redirect_to: "https://niskalawear.com/auth/confirm-invite",
         },
@@ -147,7 +144,7 @@ export default function Users() {
       const errMsg = await getErrorMessage(res);
       if (errMsg) throw new Error(errMsg);
       toast({ title: "Pengguna berhasil diundang", description: `${inviteEmail} — ${ROLE_LABEL[inviteRole]}` });
-      setOpenInvite(false); setInviteEmail(""); setInvitePassword(""); setInviteRole("admin");
+      setOpenInvite(false); setInviteEmail(""); setInviteRole("admin");
       load();
     } catch (err: any) {
       toast({ title: "Gagal", description: err.message, variant: "destructive" });
@@ -405,25 +402,7 @@ export default function Users() {
                 />
               </div>
 
-              <div>
-                <label className="text-xs uppercase tracking-wider text-muted-foreground block mb-1.5">
-                  Password Default
-                </label>
-                <div className="relative">
-                  <input
-                    type={showInvitePass ? "text" : "password"}
-                    required minLength={8} value={invitePassword}
-                    onChange={e => setInvitePassword(e.target.value)}
-                    className="w-full px-3 py-2.5 border border-border bg-background text-sm focus:outline-none focus:border-foreground pr-10"
-                    placeholder="Minimal 8 karakter"
-                  />
-                  <button type="button" onClick={() => setShowInvitePass(v => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" tabIndex={-1}>
-                    {showInvitePass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">Pengguna diwajibkan mengganti password ini saat login pertama.</p>
-              </div>
+              {/* Password tidak diperlukan — user akan set sendiri via email invite */}
 
               <div>
                 <label className="text-xs uppercase tracking-wider text-muted-foreground block mb-1.5">Role</label>

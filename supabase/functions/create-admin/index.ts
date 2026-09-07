@@ -230,7 +230,21 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (existingProf) {
-        if (!existingProf.must_change_password) {
+        // Pastikan apakah akun di auth.users benar-benar masih ada
+        const { data: authUserCheck } = await admin.auth.admin.getUserById(
+          existingProf.id,
+        );
+
+        if (!authUserCheck?.user) {
+          // Akun pernah dihapus dari auth tapi row profile tertinggal (orphan profile).
+          // Bersihkan data lama agar flow berlanjut sebagai pendaftaran akun baru yang bersih.
+          await admin.from("profiles").delete().eq("id", existingProf.id);
+          await admin.from("user_roles").delete().eq("user_id", existingProf.id);
+          await admin
+            .from("password_reset_requests")
+            .delete()
+            .eq("user_id", existingProf.id);
+        } else if (!existingProf.must_change_password) {
           return json(
             {
               error:
@@ -238,53 +252,54 @@ Deno.serve(async (req) => {
             },
             400,
           );
-        }
-        // Akun sudah dibuat: kirim token undangan baru untuk aktivasi akun.
-        if (hasResend) {
-          const { data: linkData, error: linkErr } =
-            await admin.auth.admin.generateLink({
-              type: "invite",
-              email,
-              options: { redirectTo },
-            });
-          const tokenHash = linkData?.properties?.hashed_token;
-          if (linkErr || !tokenHash) {
-            return json(
-              {
-                error: `Gagal membuat ulang undangan: ${linkErr?.message || "Token tidak tersedia"}`,
-              },
-              400,
-            );
-          }
-          const resendRes = await sendInviteEmail(
-            email,
-            buildPasswordLink(tokenHash, "invite"),
-            appName,
-          );
-          if (!resendRes.sent) {
-            return json(
-              { error: `Gagal mengirim ulang undangan: ${resendRes.error}` },
-              400,
-            );
-          }
         } else {
-          const { error: resetErr } = await admin.auth.resetPasswordForEmail(
-            email,
-            { redirectTo },
-          );
-          if (resetErr) {
-            return json(
-              { error: `Gagal mengirim ulang undangan: ${resetErr.message}` },
-              400,
+          // Akun sudah dibuat dan user valid: kirim token undangan baru untuk aktivasi akun.
+          if (hasResend) {
+            const { data: linkData, error: linkErr } =
+              await admin.auth.admin.generateLink({
+                type: "invite",
+                email,
+                options: { redirectTo },
+              });
+            const tokenHash = linkData?.properties?.hashed_token;
+            if (linkErr || !tokenHash) {
+              return json(
+                {
+                  error: `Gagal membuat ulang undangan: ${linkErr?.message || "Token tidak tersedia"}`,
+                },
+                400,
+              );
+            }
+            const resendRes = await sendInviteEmail(
+              email,
+              buildPasswordLink(tokenHash, "invite"),
+              appName,
             );
+            if (!resendRes.sent) {
+              return json(
+                { error: `Gagal mengirim ulang undangan: ${resendRes.error}` },
+                400,
+              );
+            }
+          } else {
+            const { error: resetErr } = await admin.auth.resetPasswordForEmail(
+              email,
+              { redirectTo },
+            );
+            if (resetErr) {
+              return json(
+                { error: `Gagal mengirim ulang undangan: ${resetErr.message}` },
+                400,
+              );
+            }
           }
+          return json({
+            ok: true,
+            user_id: existingProf.id,
+            resent: true,
+            email_sent: true,
+          });
         }
-        return json({
-          ok: true,
-          user_id: existingProf.id,
-          resent: true,
-          email_sent: true,
-        });
       }
 
       let userId: string | null = null;
@@ -355,10 +370,10 @@ Deno.serve(async (req) => {
         return json({ error: "Gagal mendaftarkan pengguna" }, 400);
       }
 
-      // Update password default jika disediakan
-      if (password) {
-        await admin.auth.admin.updateUserById(userId, { password });
-      }
+      // CATATAN: Jangan panggil updateUserById(password) di sini!
+      // Memanggil updateUserById SETELAH generateLink akan menginvalidasi
+      // OTP token invite yang baru dibuat, menyebabkan token selalu expired.
+      // User akan set password mereka sendiri melalui halaman ConfirmInvite.
 
       // Upsert profile
       await admin.from("profiles").upsert({
@@ -644,6 +659,10 @@ Deno.serve(async (req) => {
       }
 
       // Clean up relations first before deleting user from auth
+      await admin
+        .from("password_reset_requests")
+        .delete()
+        .eq("user_id", targetUserId);
       await admin.from("user_roles").delete().eq("user_id", targetUserId);
       await admin.from("profiles").delete().eq("id", targetUserId);
 

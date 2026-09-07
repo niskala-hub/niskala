@@ -65,36 +65,32 @@ export default function ConfirmInvite() {
         }
     }, []);
 
-    // Listener: tangkap jika Supabase SDK auto-sign-in dari hash (safety net)
-    useEffect(() => {
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-            // Jika SDK auto-detect session dari hash fragment (misal invite flow)
-            if ((event === "SIGNED_IN" || event === "USER_UPDATED") && session?.user?.email) {
-                if (flowStep === "INITIAL_CONFIRM" || flowStep === "SET_PASSWORD") {
-                    setEmail(session.user.email);
-                    setFlowStep("SET_PASSWORD");
-                }
-            }
-        });
-        return () => subscription.unsubscribe();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
 
     const handleActivate = async () => {
         setBusy(true);
         setInlineError("");
         try {
-            // 1. Cek dulu apakah session sudah terbentuk otomatis oleh SDK
-            //    (bisa terjadi jika Supabase detectSessionInUrl aktif atau dari onAuthStateChange)
-            const { data: currentSession } = await supabase.auth.getSession();
-            let userEmail = currentSession.session?.user?.email;
+            let userEmail: string | undefined;
 
-            // 2. Jika belum ada session & ada token, lakukan verifikasi manual
-            if (!userEmail) {
-                if (!tokenHash && !isPkceCode) {
-                    // Tidak ada token di URL dan tidak ada session — undangan sudah tidak valid
-                    setFlowStep("EXPIRED");
-                    return;
+            if (tokenHash || isPkceCode) {
+                // SELALU verifikasi token dari URL — jangan gunakan cached session.
+                // Sign out session lama secara lokal untuk membersihkan JWT stale dari browser storage.
+                // Ini krusial untuk kasus user yang dihapus lalu diundang ulang dengan email yang sama —
+                // tanpa ini, browser mungkin masih menyimpan dan memakai JWT user lama (yang sudah dihapus) saat updateUser.
+                try {
+                    await supabase.auth.signOut({ scope: "local" });
+                } catch {
+                    // Abaikan jika sign out lokal gagal
+                }
+
+                try {
+                    Object.keys(localStorage).forEach((key) => {
+                        if (key.startsWith("sb-") && key.endsWith("-auth-token")) {
+                            localStorage.removeItem(key);
+                        }
+                    });
+                } catch {
+                    // Abaikan jika storage dibatasi
                 }
 
                 const { data, error } = isPkceCode
@@ -102,11 +98,23 @@ export default function ConfirmInvite() {
                     : await supabase.auth.verifyOtp({ token_hash: tokenHash!, type: otpType });
 
                 if (error) throw error;
+
+                if (data.session) {
+                    await supabase.auth.setSession(data.session);
+                }
+
                 userEmail = data.user?.email ?? data.session?.user?.email;
+            } else {
+                // Tidak ada token di URL — gunakan session yang sudah ada sebagai fallback
+                const { data: currentSession } = await supabase.auth.getSession();
+                userEmail = currentSession.session?.user?.email;
+                if (!userEmail) {
+                    setFlowStep("EXPIRED");
+                    return;
+                }
             }
 
             if (!userEmail) throw new Error("Sesi akun belum tersedia. Silakan coba lagi.");
-
             setEmail(userEmail);
             setFlowStep("SET_PASSWORD");
         } catch (error: unknown) {
