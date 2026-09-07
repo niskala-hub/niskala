@@ -244,8 +244,8 @@ Deno.serve(async (req) => {
               email,
               options: { redirectTo },
             });
-          const rawToken = linkData?.properties?.email_otp;
-          if (linkErr || !rawToken) {
+          const tokenHash = linkData?.properties?.hashed_token;
+          if (linkErr || !tokenHash) {
             return json(
               {
                 error: `Gagal membuat ulang undangan: ${linkErr?.message || "Token tidak tersedia"}`,
@@ -255,7 +255,7 @@ Deno.serve(async (req) => {
           }
           const resendRes = await sendInviteEmail(
             email,
-            buildPasswordLink(rawToken, "invite"),
+            buildPasswordLink(tokenHash, "invite"),
             appName,
           );
           if (!resendRes.sent) {
@@ -307,8 +307,8 @@ Deno.serve(async (req) => {
         }
 
         userId = linkData.user.id;
-        const rawToken = linkData.properties?.email_otp;
-        if (!rawToken) {
+        const tokenHash = linkData.properties?.hashed_token;
+        if (!tokenHash) {
           return json(
             { error: "Gagal membuat undangan: token tidak tersedia" },
             400,
@@ -317,7 +317,7 @@ Deno.serve(async (req) => {
 
         const resendRes = await sendInviteEmail(
           email,
-          buildPasswordLink(rawToken, "invite"),
+          buildPasswordLink(tokenHash, "invite"),
           appName,
         );
         emailSent = resendRes.sent;
@@ -478,13 +478,12 @@ Deno.serve(async (req) => {
             options: { redirectTo },
           });
 
-        // 🛑 UBAH hashed_token MENJADI email_otp
-        const rawToken = linkData?.properties?.email_otp;
+        const tokenHash = linkData?.properties?.hashed_token;
 
-        if (rawToken) {
+        if (tokenHash) {
           const resendRes = await sendInviteEmail(
             targetEmail,
-            buildPasswordLink(rawToken, "invite"),
+            buildPasswordLink(tokenHash, "invite"),
             appName,
           );
           emailSent = resendRes.sent;
