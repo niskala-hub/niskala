@@ -88,9 +88,13 @@ export default function Index() {
   return (
     <>
       {/* Hero — full bleed, header overlays this */}
-      <section className="w-full h-[70vh] relative -mt-[72px]">
-        <img src={heroBg} alt="Handcrafted artisan knitwear" className="w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-[hsl(30_30%_22%/0.3)]" />
+      <section className="w-full h-[70vh] min-h-[480px] relative -mt-[72px] overflow-hidden">
+        <img
+          src={heroBg}
+          alt="Handcrafted artisan knitwear"
+          className="w-full h-full object-cover object-[68%_center] sm:object-[65%_center] md:object-[62%_center] lg:object-center"
+        />
+        <div className="absolute inset-0 bg-black/20 bg-gradient-to-t from-black/50 via-transparent to-black/30" />
         <div className="absolute bottom-0 left-0 right-0 px-4 md:px-6 pb-12 md:pb-20">
           <h1 className="text-4xl md:text-7xl lg:text-8xl font-light text-white tracking-wide max-w-7xl mx-auto leading-none">
             New Collection
