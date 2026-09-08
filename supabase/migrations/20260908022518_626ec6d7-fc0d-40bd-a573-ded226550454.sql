@@ -1,0 +1,1 @@
+REVOKE ALL ON FUNCTION public.sync_order_cash_transaction() FROM anon, authenticated, public;
