@@ -163,30 +163,42 @@ export type Database = {
       }
       orders: {
         Row: {
+          channel: string
           created_at: string
           customer_name: string | null
           customer_phone: string | null
           id: string
+          notes: string | null
+          paid_at: string | null
+          payment_status: string
           status: string
           total_hpp: number
           total_price: number
           updated_at: string
         }
         Insert: {
+          channel?: string
           created_at?: string
           customer_name?: string | null
           customer_phone?: string | null
           id?: string
+          notes?: string | null
+          paid_at?: string | null
+          payment_status?: string
           status?: string
           total_hpp?: number
           total_price?: number
           updated_at?: string
         }
         Update: {
+          channel?: string
           created_at?: string
           customer_name?: string | null
           customer_phone?: string | null
           id?: string
+          notes?: string | null
+          paid_at?: string | null
+          payment_status?: string
           status?: string
           total_hpp?: number
           total_price?: number
