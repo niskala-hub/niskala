@@ -22,6 +22,8 @@ import AdminProducts from "./pages/admin/Products";
 import AdminBioLinks from "./pages/admin/BioLinks";
 import AdminUsers from "./pages/admin/Users";
 import AdminAccounting from "./pages/admin/Accounting";
+import AdminOrders from "./pages/admin/Orders";
+import AdminProfile from "./pages/admin/Profile";
 import LinkBio from "./pages/LinkBio";
 import NotFound from "./pages/NotFound";
 import ChangePassword from "./pages/ChangePassword";
