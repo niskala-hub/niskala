@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { NavLink, Navigate, Outlet, Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { LayoutDashboard, Package, Tags, LogOut, Store, Link2, Wallet, Users, Menu, X } from "lucide-react";
+import { LayoutDashboard, Package, Tags, LogOut, Store, Link2, Wallet, Users, Menu, X, ShoppingBag, UserCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function AdminLayout() {
