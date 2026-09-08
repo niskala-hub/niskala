@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Navigate } from "react-router-dom";
 import {
-  Plus, Trash2, X, Crown, ShieldCheck, ShieldHalf, KeyRound, RefreshCw, Send,
+  Plus, Trash2, X, Crown, ShieldCheck, ShieldHalf, KeyRound, RefreshCw, Send, Eye, EyeOff,
 } from "lucide-react";
 
 type RoleType = "owner" | "co_owner" | "admin";
