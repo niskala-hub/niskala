@@ -47,8 +47,14 @@ export default function AdminLayout() {
         <NavLink to="/admin/bio-links" className={cls}>
           <Link2 className="w-4 h-4" /> Bio Links
         </NavLink>
+        <NavLink to="/admin/orders" className={cls}>
+          <ShoppingBag className="w-4 h-4" /> Orders
+        </NavLink>
         <NavLink to="/admin/accounting" className={cls}>
           <Wallet className="w-4 h-4" /> Accounting
+        </NavLink>
+        <NavLink to="/admin/profile" className={cls}>
+          <UserCircle className="w-4 h-4" /> Profile
         </NavLink>
         {canManageUsers && (
           <NavLink to="/admin/users" className={cls}>
