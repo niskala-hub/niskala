@@ -38,6 +38,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { fetchAccountingSummary } from "@/services/accountingService";
 
 type TxType = "inflow" | "outflow";
 
@@ -50,6 +51,8 @@ interface CashTransaction {
   description: string | null;
   reference_id: string | null;
   receipt_url: string | null;
+  is_reversal: boolean;
+  reversed_by: string | null;
   created_at: string;
 }
 
@@ -137,9 +140,9 @@ export default function Accounting() {
 
   const load = async () => {
     setLoading(true);
-    const [transactionResult, orders] = await Promise.allSettled([
+    const [transactionResult, summaryResult] = await Promise.allSettled([
       loadAllCashTransactions(),
-      supabase.from("orders").select("total_price, total_hpp"),
+      fetchAccountingSummary(),
     ]);
 
     if (transactionResult.status === "rejected") {
@@ -147,12 +150,8 @@ export default function Accounting() {
     } else {
       setTransactions(transactionResult.value);
     }
-    if (orders.status === "fulfilled" && !orders.value.error) {
-      const profit = (orders.value.data ?? []).reduce(
-        (sum, o) => sum + (Number(o.total_price) - Number(o.total_hpp)),
-        0
-      );
-      setGrossProfit(profit);
+    if (summaryResult.status === "fulfilled") {
+      setGrossProfit(summaryResult.value.gross_profit_estimate);
     }
     setLoading(false);
   };
@@ -194,6 +193,14 @@ export default function Accounting() {
   };
 
   const openEdit = (t: CashTransaction) => {
+    if (t.is_reversal || t.reference_id) {
+      toast({
+        title: "Transaksi otomatis tidak dapat diedit",
+        description: "Transaksi kas dari pesanan atau pembalik (reversal) bersifat immutable dan tidak boleh diedit secara manual.",
+        variant: "destructive",
+      });
+      return;
+    }
     setEditing(t);
     setDraft({
       type: t.type,
@@ -274,9 +281,17 @@ export default function Accounting() {
     load();
   };
 
-  const remove = async (id: string) => {
+  const remove = async (t: CashTransaction) => {
+    if (t.is_reversal || t.reference_id) {
+      toast({
+        title: "Transaksi otomatis tidak dapat dihapus",
+        description: "Transaksi kas dari pesanan atau pembalik (reversal) tidak dapat dihapus untuk menjaga audit trail pembukuan.",
+        variant: "destructive",
+      });
+      return;
+    }
     if (!confirm("Hapus transaksi ini?")) return;
-    const { error } = await supabase.from("cash_transactions").delete().eq("id", id);
+    const { error } = await supabase.from("cash_transactions").delete().eq("id", t.id);
     if (error) {
       toast({ title: "Gagal menghapus", description: error.message, variant: "destructive" });
       return;
@@ -526,12 +541,18 @@ export default function Accounting() {
                   )}
                 </div>
                 <div className="flex gap-1">
-                  <button onClick={() => openEdit(t)} className="p-2 hover:bg-muted" aria-label="Edit">
-                    <Pencil className="w-4 h-4" />
-                  </button>
-                  <button onClick={() => remove(t.id)} className="p-2 hover:bg-muted text-red-600" aria-label="Hapus">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  {t.is_reversal || t.reference_id ? (
+                    <span className="text-[10px] text-muted-foreground italic px-2 py-1">Terkunci (Order)</span>
+                  ) : (
+                    <>
+                      <button onClick={() => openEdit(t)} className="p-2 hover:bg-muted" aria-label="Edit">
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => remove(t)} className="p-2 hover:bg-muted text-red-600" aria-label="Hapus">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -569,19 +590,29 @@ export default function Accounting() {
                 <tr key={t.id} className="border-t border-border">
                   <td className="px-4 py-3 whitespace-nowrap">{formatDate(t.transaction_date)}</td>
                   <td className="px-4 py-3">
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "rounded-none",
-                        t.type === "inflow"
-                          ? "border-emerald-600 text-emerald-700"
-                          : "border-red-600 text-red-600"
+                    <div className="flex items-center gap-1.5">
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "rounded-none",
+                          t.type === "inflow"
+                            ? "border-emerald-600 text-emerald-700"
+                            : "border-red-600 text-red-600"
+                        )}
+                      >
+                        {t.type === "inflow" ? "Masuk" : "Keluar"}
+                      </Badge>
+                      {t.is_reversal && (
+                        <Badge variant="outline" className="rounded-none border-amber-600/70 text-amber-700 bg-amber-50/60 text-[10px]">
+                          Reversal
+                        </Badge>
                       )}
-                    >
-                      {t.type === "inflow" ? "Masuk" : "Keluar"}
-                    </Badge>
+                    </div>
                   </td>
-                  <td className="px-4 py-3">{t.category}</td>
+                  <td className="px-4 py-3">
+                    <div>{t.category}</div>
+                    {t.reference_id && <span className="text-[10px] text-muted-foreground font-mono block">Auto Order</span>}
+                  </td>
                   <td className="px-4 py-3 text-muted-foreground max-w-[220px] truncate" title={t.description ?? ""}>
                     {t.description ?? "—"}
                   </td>
@@ -608,14 +639,18 @@ export default function Accounting() {
                     {t.type === "inflow" ? "+" : "−"} {formatIDR(Number(t.amount))}
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex justify-end gap-1">
-                      <button onClick={() => openEdit(t)} className="p-2 hover:bg-muted" aria-label="Edit">
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => remove(t.id)} className="p-2 hover:bg-muted text-red-600" aria-label="Hapus">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+                    {t.is_reversal || t.reference_id ? (
+                      <span className="text-[10px] text-muted-foreground italic block text-right">Terkunci</span>
+                    ) : (
+                      <div className="flex justify-end gap-1">
+                        <button onClick={() => openEdit(t)} className="p-2 hover:bg-muted" aria-label="Edit">
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => remove(t)} className="p-2 hover:bg-muted text-red-600" aria-label="Hapus">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))

@@ -60,8 +60,12 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          /** TRUE jika transaksi ini adalah pembalik (reversal/credit note) */
+          is_reversal: boolean
           receipt_url: string | null
           reference_id: string | null
+          /** FK ke cash_transactions.id — transaksi asal yang dibalik */
+          reversed_by: string | null
           transaction_date: string
           type: Database["public"]["Enums"]["cash_flow_type"]
         }
@@ -71,8 +75,10 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          is_reversal?: boolean
           receipt_url?: string | null
           reference_id?: string | null
+          reversed_by?: string | null
           transaction_date?: string
           type: Database["public"]["Enums"]["cash_flow_type"]
         }
@@ -82,12 +88,22 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          is_reversal?: boolean
           receipt_url?: string | null
           reference_id?: string | null
+          reversed_by?: string | null
           transaction_date?: string
           type?: Database["public"]["Enums"]["cash_flow_type"]
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "cash_transactions_reversed_by_fkey"
+            columns: ["reversed_by"]
+            isOneToOne: false
+            referencedRelation: "cash_transactions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       categories: {
         Row: {
@@ -163,6 +179,10 @@ export type Database = {
       }
       orders: {
         Row: {
+          /** Timestamp pembatalan order (audit trail) */
+          cancelled_at: string | null
+          /** Alasan pembatalan order */
+          cancellation_reason: string | null
           channel: string
           created_at: string
           customer_name: string | null
@@ -172,11 +192,15 @@ export type Database = {
           paid_at: string | null
           payment_status: string
           status: string
+          /** TRUE jika stok sudah dikurangi untuk order ini */
+          stock_deducted: boolean
           total_hpp: number
           total_price: number
           updated_at: string
         }
         Insert: {
+          cancelled_at?: string | null
+          cancellation_reason?: string | null
           channel?: string
           created_at?: string
           customer_name?: string | null
@@ -186,11 +210,14 @@ export type Database = {
           paid_at?: string | null
           payment_status?: string
           status?: string
+          stock_deducted?: boolean
           total_hpp?: number
           total_price?: number
           updated_at?: string
         }
         Update: {
+          cancelled_at?: string | null
+          cancellation_reason?: string | null
           channel?: string
           created_at?: string
           customer_name?: string | null
@@ -200,6 +227,7 @@ export type Database = {
           paid_at?: string | null
           payment_status?: string
           status?: string
+          stock_deducted?: boolean
           total_hpp?: number
           total_price?: number
           updated_at?: string
@@ -465,7 +493,53 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_accounting_summary: {
+        Row: {
+          /** Total kas masuk (semua kategori, bukan reversal) */
+          total_inflow: number
+          /** Total kas keluar (termasuk reversal) */
+          total_outflow: number
+          /** Total inflow khusus dari kategori Penjualan */
+          total_sales_inflow: number
+          /** Total nilai reversal (pembatalan) */
+          total_reversals: number
+          /** Saldo kas bersih: inflow - outflow */
+          net_cash: number
+          /** Total HPP dari order yang sudah lunas */
+          total_cogs_paid: number
+          /** Estimasi Laba Kotor = Inflow Penjualan - HPP Terjual */
+          gross_profit_estimate: number
+          /** Margin Laba Kotor dalam persen */
+          gross_margin_percent: number
+        }
+        Relationships: []
+      }
+      v_monthly_cash_flow: {
+        Row: {
+          month: string
+          month_label: string
+          inflow: number
+          outflow: number
+          net: number
+        }
+        Relationships: []
+      }
+      v_order_profitability: {
+        Row: {
+          order_id: string
+          customer_name: string | null
+          channel: string
+          status: string
+          payment_status: string
+          created_at: string
+          paid_at: string | null
+          total_price: number
+          total_hpp: number
+          gross_profit: number
+          gross_margin_percent: number
+        }
+        Relationships: []
+      }
     }
     Functions: {
       has_role: {
@@ -480,6 +554,16 @@ export type Database = {
         Returns: undefined
       }
       is_owner_or_coowner: { Args: { _user_id: string }; Returns: boolean }
+      validate_order_stock: {
+        Args: { p_order_id: string }
+        Returns: Array<{
+          product_id: string
+          product_name: string
+          requested: number
+          available: number
+          is_sufficient: boolean
+        }>
+      }
     }
     Enums: {
       app_role: "admin" | "user" | "owner" | "co_owner"

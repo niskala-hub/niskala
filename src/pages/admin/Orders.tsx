@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { createOrder } from "@/services/orderService";
 
 interface OrderItem {
   id: string;
@@ -42,6 +43,9 @@ interface Order {
   channel: string;
   notes: string | null;
   paid_at: string | null;
+  cancelled_at: string | null;
+  cancellation_reason: string | null;
+  stock_deducted: boolean;
   total_price: number;
   total_hpp: number;
   created_at: string;
@@ -129,7 +133,7 @@ export default function Orders() {
       supabase
         .from("orders")
         .select(
-          "id, customer_name, customer_phone, status, payment_status, channel, notes, paid_at, total_price, total_hpp, created_at, order_items(id, product_id, product_name, quantity, unit_price, unit_hpp)"
+          "id, customer_name, customer_phone, status, payment_status, channel, notes, paid_at, cancelled_at, cancellation_reason, stock_deducted, total_price, total_hpp, created_at, order_items(id, product_id, product_name, quantity, unit_price, unit_hpp)"
         )
         .order("created_at", { ascending: false }),
       supabase.from("products").select("id, name, price, hpp_price").order("name"),
@@ -273,27 +277,51 @@ export default function Orders() {
     };
 
     try {
-      let orderId = editing?.id;
       if (editing) {
-        const { error } = await supabase.from("orders").update(payload).eq("id", editing.id);
-        if (error) throw error;
-        const { error: delErr } = await supabase.from("order_items").delete().eq("order_id", editing.id);
-        if (delErr) throw delErr;
+        if (editing.payment_status === "paid") {
+          // Hanya update customer info, notes, channel agar immutability item terjaga
+          const { error } = await supabase.from("orders").update({
+            customer_name: payload.customer_name,
+            customer_phone: payload.customer_phone,
+            channel: payload.channel,
+            notes: payload.notes,
+          }).eq("id", editing.id);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.from("orders").update(payload).eq("id", editing.id);
+          if (error) throw error;
+          const { error: delErr } = await supabase.from("order_items").delete().eq("order_id", editing.id);
+          if (delErr) throw delErr;
+          const { error: itemErr } = await supabase
+            .from("order_items")
+            .insert(items.map((it) => ({ ...it, order_id: editing.id })));
+          if (itemErr) throw itemErr;
+        }
       } else {
-        const { data, error } = await supabase.from("orders").insert(payload).select("id").single();
-        if (error) throw error;
-        orderId = data.id;
+        await createOrder({
+          customer_name: draft.customer_name.trim() || undefined,
+          customer_phone: draft.customer_phone.trim() || undefined,
+          channel: draft.channel as any,
+          status: draft.status as any,
+          payment_status: draft.payment_status as any,
+          paid_at: paidAt ?? undefined,
+          notes: draft.notes.trim() || undefined,
+          order_date: draft.order_date,
+          items: items.map((it) => ({
+            product_id: it.product_id,
+            product_name: it.product_name,
+            quantity: it.quantity,
+            unit_price: it.unit_price,
+            unit_hpp: it.unit_hpp,
+          })),
+        });
       }
-      const { error: itemErr } = await supabase
-        .from("order_items")
-        .insert(items.map((it) => ({ ...it, order_id: orderId! })));
-      if (itemErr) throw itemErr;
 
       toast({
         title: editing ? "Pesanan diperbarui" : "Pesanan tersimpan",
         description:
           draft.payment_status === "paid"
-            ? "Pemasukan otomatis tercatat di Buku Kas."
+            ? "Stok produk terpotong & pemasukan otomatis tercatat di Buku Kas."
             : "Ditandai belum lunas, belum masuk Buku Kas.",
       });
       setDialogOpen(false);
@@ -306,6 +334,14 @@ export default function Orders() {
   };
 
   const togglePayment = async (o: Order) => {
+    if (o.status === "cancelled") {
+      toast({
+        title: "Pesanan telah dibatalkan",
+        description: "Pesanan yang berstatus dibatalkan tidak bisa diubah status pembayarannya.",
+        variant: "destructive",
+      });
+      return;
+    }
     const next = o.payment_status === "paid" ? "unpaid" : "paid";
     const { error } = await supabase
       .from("orders")
@@ -316,9 +352,11 @@ export default function Orders() {
       return;
     }
     toast({
-      title: next === "paid" ? "Ditandai lunas" : "Ditandai belum lunas",
+      title: next === "paid" ? "Ditandai lunas ✓" : "Ditandai belum lunas",
       description:
-        next === "paid" ? "Pemasukan tercatat di Buku Kas." : "Catatan kas pesanan ini dihapus.",
+        next === "paid"
+          ? "Stok produk terpotong & pemasukan otomatis tercatat di Buku Kas."
+          : "Koreksi kas pembalik dicatat di Buku Kas.",
     });
     load();
   };
@@ -326,11 +364,35 @@ export default function Orders() {
   const updateStatus = async (id: string, status: string) => {
     setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
     const { error } = await supabase.from("orders").update({ status }).eq("id", id);
-    if (error) toast({ title: "Gagal memperbarui status", description: error.message, variant: "destructive" });
+    if (error) {
+      toast({ title: "Gagal memperbarui status", description: error.message, variant: "destructive" });
+      load();
+      return;
+    }
+    if (status === "cancelled") {
+      toast({
+        title: "Pesanan dibatalkan",
+        description: "Stok produk otomatis dikembalikan & transaksi pembalik dicatat di Buku Kas.",
+      });
+    } else {
+      toast({
+        title: "Status diperbarui",
+        description: `Status pesanan diubah ke ${STATUS_LABEL[status] ?? status}.`,
+      });
+    }
+    load();
   };
 
   const remove = async (o: Order) => {
-    if (!confirm("Hapus pesanan ini? Catatan kas terkait juga akan dihapus.")) return;
+    if (o.payment_status === "paid") {
+      toast({
+        title: "Pesanan lunas tidak dapat dihapus",
+        description: "Demi integritas pembukuan & audit, pesanan lunas tidak boleh dihapus. Silakan ubah status menjadi 'Dibatalkan' (Cancelled) agar stok dikembalikan dan jurnal pembalik dibuat di Buku Kas.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!confirm("Hapus pesanan ini?")) return;
     const { error } = await supabase.from("orders").delete().eq("id", o.id);
     if (error) {
       toast({ title: "Gagal menghapus", description: error.message, variant: "destructive" });
@@ -425,13 +487,31 @@ export default function Orders() {
                   <div className="flex flex-wrap items-center gap-2 mb-1">
                     <p className="text-sm font-medium truncate">{o.customer_name || "Tanpa nama"}</p>
                     {paidBadge(o)}
+                    {o.status === "cancelled" && (
+                      <Badge variant="destructive" className="rounded-none text-[10px]">
+                        Dibatalkan
+                      </Badge>
+                    )}
+                    {o.stock_deducted ? (
+                      <Badge variant="outline" className="rounded-none text-[10px] border-emerald-600/70 text-emerald-700 bg-emerald-50/50">
+                        Stok Terpotong
+                      </Badge>
+                    ) : o.status === "cancelled" ? (
+                      <Badge variant="outline" className="rounded-none text-[10px] border-blue-600/70 text-blue-700 bg-blue-50/50">
+                        Stok Dikembalikan
+                      </Badge>
+                    ) : null}
                     <Badge variant="outline" className="rounded-none text-[10px]">
                       {o.channel === "online" ? "Online" : "Offline"}
                     </Badge>
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {o.customer_phone || "—"} · {formatDateTime(o.created_at)}
+                    {o.cancelled_at && ` · Dibatalkan: ${formatDateTime(o.cancelled_at)}`}
                   </p>
+                  {o.cancellation_reason && (
+                    <p className="text-xs text-red-600 mt-1">Alasan pembatalan: {o.cancellation_reason}</p>
+                  )}
                   {o.notes && <p className="text-xs text-muted-foreground mt-1 italic">{o.notes}</p>}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">

@@ -30,7 +30,7 @@ export default function AdminLayout() {
 
   const nav = (
     <>
-      <div className="px-6 py-6 border-b border-border">
+      <div className="px-6 py-6 border-b border-border shrink-0">
         <Link to="/" className="text-xl font-light tracking-widest">NISKALA</Link>
         <p className="text-xs text-muted-foreground mt-1">{isOwner ? "Owner" : isCoOwner ? "Co-Owner" : "Admin"}</p>
       </div>
@@ -53,20 +53,20 @@ export default function AdminLayout() {
         <NavLink to="/admin/accounting" className={cls}>
           <Wallet className="w-4 h-4" /> Accounting
         </NavLink>
-        <NavLink to="/admin/profile" className={cls}>
-          <UserCircle className="w-4 h-4" /> Profile
-        </NavLink>
         {canManageUsers && (
           <NavLink to="/admin/users" className={cls}>
             <Users className="w-4 h-4" /> Users
           </NavLink>
         )}
       </nav>
-      <div className="p-4 border-t border-border space-y-2">
-        <Link to="/" onClick={close} className={cn(link, linkIdle, "px-2")}>
+      <div className="py-2 border-t border-border shrink-0">
+        <NavLink to="/admin/profile" className={cls} onClick={close}>
+          <UserCircle className="w-4 h-4" /> Profile
+        </NavLink>
+        <Link to="/" onClick={close} className={cn(link, linkIdle)}>
           <Store className="w-4 h-4" /> View store
         </Link>
-        <button onClick={signOut} className={cn(link, linkIdle, "px-2 w-full")}>
+        <button onClick={signOut} className={cn(link, linkIdle, "w-full text-left")}>
           <LogOut className="w-4 h-4" /> Sign out
         </button>
       </div>
@@ -76,7 +76,7 @@ export default function AdminLayout() {
   return (
     <div className="min-h-screen flex bg-background">
       {/* Desktop sidebar */}
-      <aside className="hidden lg:flex w-64 shrink-0 border-r border-border flex-col">
+      <aside className="hidden lg:flex w-64 shrink-0 border-r border-border flex-col sticky top-0 h-screen overflow-hidden">
         {nav}
       </aside>
 
@@ -84,8 +84,8 @@ export default function AdminLayout() {
       {open && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
           <div className="absolute inset-0 bg-black/50" onClick={close} />
-          <aside className="relative w-72 max-w-[85vw] bg-background border-r border-border flex flex-col">
-            <button onClick={close} className="absolute top-5 right-4 p-1" aria-label="Close menu">
+          <aside className="relative w-72 max-w-[85vw] bg-background border-r border-border flex flex-col h-full overflow-hidden">
+            <button onClick={close} className="absolute top-5 right-4 p-1 z-10" aria-label="Close menu">
               <X className="w-5 h-5" />
             </button>
             {nav}
