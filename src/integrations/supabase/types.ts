@@ -446,6 +446,21 @@ export type Database = {
           },
         ]
       }
+      site_settings: {
+        Row: {
+          id: boolean
+          coming_soon_enabled: boolean
+        }
+        Insert: {
+          id?: boolean
+          coming_soon_enabled?: boolean
+        }
+        Update: {
+          id?: boolean
+          coming_soon_enabled?: boolean
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string

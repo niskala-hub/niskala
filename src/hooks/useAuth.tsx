@@ -46,29 +46,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
+    let mounted = true;
+
+    const loadUserData = async (userId: string) => {
+      await Promise.all([fetchRoles(userId), fetchProfile(userId)]);
+    };
+
+    const { data: sub } = supabase.auth.onAuthStateChange(async (_e, s) => {
+      if (!mounted) return;
       setSession(s);
       if (s?.user) {
-        setTimeout(() => {
-          fetchRoles(s.user.id);
-          fetchProfile(s.user.id);
-        }, 0);
+        await loadUserData(s.user.id);
       } else {
         setRoles([]);
         setMustChangePassword(false);
       }
     });
 
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (!mounted) return;
       setSession(data.session);
       if (data.session?.user) {
-        fetchRoles(data.session.user.id);
-        fetchProfile(data.session.user.id);
+        await loadUserData(data.session.user.id);
       }
-      setLoading(false);
+      if (mounted) {
+        setLoading(false);
+      }
     });
 
-    return () => sub.subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
   const signOut = async () => {

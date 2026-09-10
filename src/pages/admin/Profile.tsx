@@ -2,11 +2,14 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, EyeOff, User, KeyRound } from "lucide-react";
+import { Eye, EyeOff, User, KeyRound, Globe } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { useComingSoonSetting } from "@/hooks/useComingSoonSetting";
 
 export default function Profile() {
-  const { user, isOwner, isCoOwner } = useAuth();
+  const { user, isOwner, isCoOwner, isAdmin } = useAuth();
   const { toast } = useToast();
+  const { comingSoonEnabled, toggle: toggleComingSoon } = useComingSoonSetting();
 
   const [username, setUsername] = useState("");
   const [initialUsername, setInitialUsername] = useState("");
@@ -165,6 +168,38 @@ export default function Profile() {
           </button>
         </form>
       </section>
+      {/* ── Site Settings (owner / admin / co-owner only) ── */}
+      {isAdmin && (
+        <section className="border border-border p-5 sm:p-6">
+          <div className="flex items-center gap-2 mb-5">
+            <Globe className="w-4 h-4 text-muted-foreground" />
+            <h2 className="text-sm uppercase tracking-wider text-muted-foreground">Pengaturan Situs</h2>
+          </div>
+
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-foreground">Mode Coming Soon</p>
+              <p className="text-xs text-muted-foreground mt-0.5 max-w-xs leading-relaxed">
+                Saat aktif, semua pengunjung di-redirect ke halaman coming soon.
+                Kamu dan tim tetap bisa mengakses seluruh area admin secara normal.
+              </p>
+            </div>
+            <Switch
+              id="coming-soon-toggle"
+              checked={comingSoonEnabled}
+              onCheckedChange={async (val) => {
+                await toggleComingSoon(val);
+                toast({
+                  title: val ? "Mode Coming Soon diaktifkan" : "Mode Coming Soon dinonaktifkan",
+                  description: val
+                    ? "Pengunjung umum sekarang di-redirect ke halaman coming soon."
+                    : "Website kembali dapat diakses publik secara normal.",
+                });
+              }}
+            />
+          </div>
+        </section>
+      )}
     </div>
   );
 }

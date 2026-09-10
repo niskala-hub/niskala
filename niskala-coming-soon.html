@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Niskala — Segera Hadir</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cream: #F6F1E7;
+    --cream-deep: #EFE7D8;
+    --ink: #21170F;
+    --gold: #BB8F4E;
+    --gold-soft: #D9BE8E;
+    --terracotta: #DB7F3B;
+    --rose: #C98089;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    height: 100%;
+  }
+
+  body {
+    background: var(--cream);
+    color: var(--ink);
+    font-family: 'Jost', sans-serif;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+
+  /* Decorative ring motif, echoing the logo mark */
+  .ring {
+    position: absolute;
+    border: 1px solid var(--gold-soft);
+    border-radius: 50%;
+    pointer-events: none;
+  }
+  .ring--one {
+    width: 62vw;
+    height: 62vw;
+    max-width: 780px;
+    max-height: 780px;
+    top: -18vw;
+    right: -20vw;
+    opacity: 0.55;
+  }
+  .ring--two {
+    width: 34vw;
+    height: 34vw;
+    max-width: 420px;
+    max-height: 420px;
+    bottom: -10vw;
+    left: -8vw;
+    border-color: var(--rose);
+    opacity: 0.35;
+  }
+
+  /* Scattered dot texture referencing the polka-dot prints */
+  .dot {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--ink);
+    opacity: 0.08;
+  }
+
+  header {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    justify-content: center;
+    padding: clamp(28px, 5vw, 48px) 24px 0;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logo svg { width: 34px; height: 34px; flex-shrink: 0; }
+
+  .logo span {
+    font-family: 'Jost', sans-serif;
+    font-weight: 500;
+    font-size: clamp(20px, 3vw, 26px);
+    letter-spacing: 0.28em;
+    color: var(--ink);
+  }
+
+  main {
+    position: relative;
+    z-index: 2;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 48px 24px;
+  }
+
+  .content {
+    max-width: 620px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    opacity: 0;
+    animation: rise 1s ease-out 0.15s forwards;
+  }
+
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    letter-spacing: 0.24em;
+    color: var(--terracotta);
+    background: rgba(219, 127, 59, 0.1);
+    border: 1px solid rgba(219, 127, 59, 0.35);
+    padding: 7px 16px;
+    border-radius: 999px;
+    margin-bottom: 28px;
+  }
+  .tag::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--terracotta);
+  }
+
+  h1 {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 500;
+    font-size: clamp(40px, 7.5vw, 76px);
+    line-height: 1.05;
+    color: var(--ink);
+    margin-bottom: 22px;
+  }
+  h1 em {
+    font-style: italic;
+    color: var(--gold);
+  }
+
+  p.lede {
+    font-size: clamp(16px, 2vw, 18px);
+    line-height: 1.7;
+    color: rgba(33, 23, 15, 0.72);
+    max-width: 480px;
+    margin-bottom: 40px;
+    font-weight: 300;
+  }
+
+  .divider {
+    width: 1px;
+    height: 40px;
+    background: linear-gradient(to bottom, transparent, var(--gold), transparent);
+    margin-bottom: 32px;
+  }
+
+  .socials {
+    display: flex;
+    gap: 18px;
+  }
+
+  .socials a {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 1px solid rgba(33, 23, 15, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ink);
+    text-decoration: none;
+    transition: border-color 0.25s ease, color 0.25s ease, background 0.25s ease;
+  }
+  .socials a:hover {
+    border-color: var(--gold);
+    color: var(--gold);
+    background: rgba(187, 143, 78, 0.08);
+  }
+  .socials svg { width: 18px; height: 18px; }
+
+  footer {
+    position: relative;
+    z-index: 2;
+    text-align: center;
+    padding: 24px;
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    color: rgba(33, 23, 15, 0.45);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .content { animation: none; opacity: 1; }
+  }
+</style>
+</head>
+<body>
+  <div class="page">
+    <div class="ring ring--one"></div>
+    <div class="ring ring--two"></div>
+    <div class="dot" style="top:18%; left:12%;"></div>
+    <div class="dot" style="top:32%; left:22%;"></div>
+    <div class="dot" style="top:70%; right:16%;"></div>
+    <div class="dot" style="top:60%; right:26%;"></div>
+    <div class="dot" style="top:12%; right:34%;"></div>
+
+    <header>
+      <div class="logo">
+        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="50" cy="50" r="46" stroke="#21170F" stroke-width="4"/>
+          <path d="M50 4 V 40" stroke="#F6F1E7" stroke-width="6"/>
+          <path d="M35 30 L 65 70" stroke="#21170F" stroke-width="7" stroke-linecap="square"/>
+          <path d="M35 30 V 70" stroke="#21170F" stroke-width="7" stroke-linecap="square"/>
+          <path d="M65 30 V 70" stroke="#21170F" stroke-width="7" stroke-linecap="square"/>
+        </svg>
+        <span>NISKALA</span>
+      </div>
+    </header>
+
+    <main>
+      <div class="content">
+        <span class="tag">Coming Soon</span>
+        <h1>Ruang istirahatmu,<br><em>segera</em> hadir.</h1>
+        <p class="lede">
+          Kami sedang menyiapkan koleksi homedress, sleepdress, dan piyama Niskala —
+          dibuat untuk menemani setiap momen santaimu di rumah dengan bahan yang
+          lembut dan desain yang tetap anggun.
+        </p>
+        <div class="divider"></div>
+        <div class="socials">
+          <a href="https://instagram.com/niskala" target="_blank" rel="noopener" aria-label="Instagram Niskala">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r="1"/></svg>
+          </a>
+          <a href="https://tiktok.com/@niskala" target="_blank" rel="noopener" aria-label="TikTok Niskala">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.5 3c.3 2 1.7 3.6 3.9 3.9v2.7a6.6 6.6 0 0 1-3.9-1.3v6.9a5.6 5.6 0 1 1-4.8-5.5v2.8a2.8 2.8 0 1 0 2 2.7V3h2.8z"/></svg>
+          </a>
+        </div>
+      </div>
+    </main>
+
+    <footer>
+      © 2026 NISKALA — PREMIUM HOMEWEAR
+    </footer>
+  </div>
+</body>
+</html>

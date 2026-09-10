@@ -5,6 +5,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { CartProvider } from "@/context/CartContext";
 import { AuthProvider } from "@/hooks/useAuth";
+import ComingSoonGate from "@/components/ComingSoonGate";
+import ComingSoonPage from "./pages/ComingSoonPage";
 import Layout from "@/components/Layout";
 import Index from "./pages/Index";
 import Shop from "./pages/Shop";
@@ -39,6 +41,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <ComingSoonGate>
             <Routes>
               <Route element={<Layout />}>
                 <Route path="/" element={<Index />} />
@@ -50,6 +53,7 @@ const App = () => (
                 <Route path="/collections/sleep-dress" element={<SleepDress />} />
                 <Route path="/collections/lounge-sets" element={<LoungeSets />} />
               </Route>
+              <Route path="/coming-soon" element={<ComingSoonPage />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/auth/change-password" element={<ChangePassword />} />
               <Route path="/auth/confirm-invite" element={<ConfirmInvite />} />
@@ -67,6 +71,7 @@ const App = () => (
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
+            </ComingSoonGate>
           </BrowserRouter>
         </CartProvider>
       </AuthProvider>
