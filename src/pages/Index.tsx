@@ -15,6 +15,7 @@ interface DBProduct {
   price: number;
   original_price: number | null;
   status: string | null;
+  price_status: string | null;
   stock: number;
   image_url: string | null;
 }
@@ -28,7 +29,7 @@ export default function Index() {
       // 1. Fetch featured products
       const { data: pData } = await supabase
         .from("products")
-        .select("slug,name,price,original_price,status,stock,image_url")
+        .select("slug,name,price,original_price,status,price_status,stock,image_url")
         .order("created_at", { ascending: false })
         .limit(3);
       setDbProducts(pData || []);
@@ -67,23 +68,25 @@ export default function Index() {
 
   const featured = dbProducts && dbProducts.length > 0
     ? dbProducts.map((p, i) => ({
-        slug: p.slug,
-        name: p.name,
-        price: Number(p.price),
-        original_price: p.original_price ? Number(p.original_price) : undefined,
-        image: resolveProductImage(p.image_url, i % 2 === 0 ? "daster" : "pajamas"),
-        status: (p.status as any) || "ready",
-        stock: p.stock,
-      }))
+      slug: p.slug,
+      name: p.name,
+      price: Number(p.price),
+      original_price: p.original_price ? Number(p.original_price) : undefined,
+      image: resolveProductImage(p.image_url, i % 2 === 0 ? "daster" : "pajamas"),
+      status: (p.status as any) || "ready",
+      price_status: p.price_status,
+      stock: p.stock,
+    }))
     : fallbackFeatured.map(p => ({
-        slug: p.slug,
-        name: p.name,
-        price: p.price,
-        original_price: p.originalPrice,
-        image: p.image,
-        status: (p.status as any) || "ready",
-        stock: p.stock ?? 10,
-      }));
+      slug: p.slug,
+      name: p.name,
+      price: p.price,
+      original_price: p.originalPrice,
+      image: p.image,
+      status: (p.status as any) || "ready",
+      price_status: p.price_status,
+      stock: p.stock ?? 10,
+    }));
 
   return (
     <>
@@ -120,6 +123,7 @@ export default function Index() {
                   image: product.image,
                   description: "",
                   status: product.status,
+                  price_status: product.price_status,
                   stock: product.stock,
                 }}
               />

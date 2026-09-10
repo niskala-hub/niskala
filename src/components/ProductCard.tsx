@@ -1,12 +1,18 @@
 import { Link } from "react-router-dom";
 import type { Product } from "@/data/products";
 import { formatIDR } from "@/lib/currency";
-import { getProductStatusInfo } from "@/lib/product";
+import { getProductStatusInfo, isProductPriceComingSoon } from "@/lib/product";
 
 export default function ProductCard({ product }: { product: Product }) {
   const statusInfo = getProductStatusInfo({
     status: product.status || (product.badge === "sold-out" ? "sold" : "ready"),
     stock: product.stock ?? (product.badge === "sold-out" ? 0 : 10),
+  });
+
+  const isPriceComingSoon = isProductPriceComingSoon({
+    price: product.price,
+    price_status: product.price_status,
+    status: product.status,
   });
 
   const origPrice = product.original_price ?? product.originalPrice;
@@ -45,16 +51,24 @@ export default function ProductCard({ product }: { product: Product }) {
             <span className="text-xs text-amber-600 font-medium shrink-0">Coming Soon</span>
           ) : statusInfo.isSold ? (
             <span className="text-xs text-muted-foreground font-medium shrink-0">Sold out</span>
-          ) : origPrice && origPrice > product.price ? (
+          ) : !isPriceComingSoon && origPrice && origPrice > product.price ? (
             <span className="text-xs text-accent font-medium shrink-0">Sale</span>
           ) : null}
         </div>
         <div className="flex items-center gap-2 mt-1">
-          <span className="text-sm font-medium text-foreground">{formatIDR(product.price)}</span>
-          {origPrice && origPrice > product.price && (
-            <span className="text-xs sm:text-sm text-muted-foreground/60 line-through">
-              {formatIDR(origPrice)}
+          {isPriceComingSoon ? (
+            <span className="text-xs sm:text-sm font-medium text-amber-700 tracking-wide uppercase">
+              Coming Soon
             </span>
+          ) : (
+            <>
+              <span className="text-sm font-medium text-foreground">{formatIDR(product.price)}</span>
+              {origPrice && origPrice > product.price && (
+                <span className="text-xs sm:text-sm text-muted-foreground/60 line-through">
+                  {formatIDR(origPrice)}
+                </span>
+              )}
+            </>
           )}
         </div>
       </div>

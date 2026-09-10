@@ -11,6 +11,7 @@ export interface Product {
   badge?: "sale" | "sold-out";
   availability?: string;
   status?: "ready" | "coming_soon" | "sold";
+  price_status?: "active" | "coming_soon" | string | null;
   stock?: number;
 }
 

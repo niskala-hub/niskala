@@ -1,4 +1,5 @@
 export type ProductStatus = "ready" | "coming_soon" | "sold";
+export type PriceStatus = "active" | "coming_soon";
 
 export interface ProductStatusInfo {
   status: ProductStatus;
@@ -23,4 +24,17 @@ export function getProductStatusInfo(product: { status?: string | null; stock: n
     isComingSoon: status === "coming_soon",
     isReady: status === "ready",
   };
+}
+
+export function isProductPriceComingSoon(product: {
+  price?: number | null;
+  price_status?: string | null;
+  status?: string | null;
+}): boolean {
+  if (product.price_status === "coming_soon") return true;
+  if (product.price_status === "active") {
+    return !product.price || Number(product.price) <= 0;
+  }
+  if (!product.price || Number(product.price) <= 0) return true;
+  return false;
 }

@@ -10,6 +10,7 @@ interface DBProduct {
   price: number;
   original_price: number | null;
   status: string | null;
+  price_status: string | null;
   stock: number;
   image_url: string | null;
 }
@@ -21,7 +22,7 @@ export default function Shop() {
   useEffect(() => {
     supabase
       .from("products")
-      .select("id,slug,name,price,original_price,status,stock,image_url")
+      .select("id,slug,name,price,original_price,status,price_status,stock,image_url")
       .order("created_at", { ascending: false })
       .then(({ data }) => {
         setProducts(data || []);
@@ -52,6 +53,7 @@ export default function Shop() {
                   image: resolveProductImage(p.image_url, i % 2 === 0 ? "daster" : "pajamas"),
                   description: "",
                   status: (p.status as any) || "ready",
+                  price_status: p.price_status,
                   stock: p.stock,
                 }}
               />

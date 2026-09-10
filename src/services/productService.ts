@@ -25,6 +25,7 @@ export interface ProductRow {
   category_id: string | null;
   original_price: number | null;
   status: string | null;
+  price_status: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -203,6 +204,7 @@ export interface UpsertProductInput {
   category_id?: string | null;
   original_price?: number | null;
   status?: string;
+  price_status?: string | null;
 }
 
 export async function createProduct(

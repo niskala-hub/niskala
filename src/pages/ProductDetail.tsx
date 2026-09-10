@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { formatIDR } from "@/lib/currency";
 import { resolveProductImage } from "@/lib/productImage";
-import { getProductStatusInfo } from "@/lib/product";
+import { getProductStatusInfo, isProductPriceComingSoon } from "@/lib/product";
 import { Check, ZoomIn, X, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface DBProduct {
@@ -14,6 +14,7 @@ interface DBProduct {
   price: number;
   original_price: number | null;
   status: string | null;
+  price_status: string | null;
   stock: number;
   description: string | null;
   image_url: string | null;
@@ -82,7 +83,7 @@ export default function ProductDetail() {
     (async () => {
       const { data } = await supabase
         .from("products")
-        .select("id,slug,name,price,original_price,status,stock,description,image_url,image_urls")
+        .select("id,slug,name,price,original_price,status,price_status,stock,description,image_url,image_urls")
         .eq("slug", slug)
         .maybeSingle();
       if (cancelled) return;
@@ -98,7 +99,7 @@ export default function ProductDetail() {
           .order("sort_order"),
         supabase
           .from("products")
-          .select("id,slug,name,price,original_price,status,stock,description,image_url,image_urls")
+          .select("id,slug,name,price,original_price,status,price_status,stock,description,image_url,image_urls")
           .neq("slug", slug)
           .gt("stock", 0)
           .limit(3),
@@ -154,14 +155,21 @@ export default function ProductDetail() {
 
   const isSoldOut = statusInfo.isSold || (selectedMotif ? selectedMotif.stock <= 0 : false);
   const isComingSoon = statusInfo.isComingSoon;
+  const isPriceComingSoon = isProductPriceComingSoon({
+    price: product.price,
+    price_status: product.price_status,
+    status: product.status,
+  });
 
   const productUrl =
     typeof window !== "undefined" ? `${window.location.origin}/product/${product.slug}` : "";
-  const waText = `Halo NISKALA, saya ingin memesan:\n\n${product.name}${
-    selectedModel ? `\nModel: ${selectedModel.name}` : ""
-  }${selectedMotif ? `\nMotif: ${selectedMotif.name}` : ""}${
-    selectedSize ? `\nSize: ${selectedSize.category} (LD ${selectedSize.ld} cm)` : ""
-  }\n${productUrl}`;
+  const waText = isPriceComingSoon
+    ? `Halo NISKALA, saya ingin menanyakan info rilis & ketersediaan:\n\n${product.name}${selectedModel ? `\nModel: ${selectedModel.name}` : ""
+    }${selectedMotif ? `\nMotif: ${selectedMotif.name}` : ""}${selectedSize ? `\nSize: ${selectedSize.category} (LD ${selectedSize.ld} cm)` : ""
+    }\nHarga: Coming Soon\n${productUrl}`
+    : `Halo NISKALA, saya ingin memesan:\n\n${product.name}${selectedModel ? `\nModel: ${selectedModel.name}` : ""
+    }${selectedMotif ? `\nMotif: ${selectedMotif.name}` : ""}${selectedSize ? `\nSize: ${selectedSize.category} (LD ${selectedSize.ld} cm)` : ""
+    }\n${productUrl}`;
 
   const selectModel = (id: string) => {
     setModelId(id);
@@ -228,11 +236,10 @@ export default function ProductDetail() {
                     <button
                       key={url + i}
                       onClick={() => setActiveImage(url)}
-                      className={`w-full aspect-[4/5] overflow-hidden border transition-all duration-200 ${
-                        active
+                      className={`w-full aspect-[4/5] overflow-hidden border transition-all duration-200 ${active
                           ? "border-primary opacity-100"
                           : "border-border opacity-60 hover:opacity-100"
-                      }`}
+                        }`}
                       aria-label={`Lihat gambar ${i + 1}`}
                     >
                       <img src={url} alt="" className="w-full h-full object-cover object-center" loading="lazy" />
@@ -251,13 +258,26 @@ export default function ProductDetail() {
 
             {/* Price section: Discount price (normal) & Original price (strikethrough) */}
             <div className="flex items-baseline gap-3 mb-4 md:mb-6">
-              <span className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground">
-                {formatIDR(Number(product.price))}
-              </span>
-              {product.original_price && Number(product.original_price) > Number(product.price) && (
-                <span className="text-xl md:text-2xl text-muted-foreground/60 line-through font-normal">
-                  {formatIDR(Number(product.original_price))}
-                </span>
+              {isPriceComingSoon ? (
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="text-3xl md:text-4xl lg:text-5xl font-bold text-amber-700 tracking-wide uppercase">
+                    Coming Soon
+                  </span>
+                  <span className="text-xs uppercase tracking-wider px-2.5 py-1 rounded bg-amber-100 text-amber-800 font-medium">
+                    Harga Segera Rilis
+                  </span>
+                </div>
+              ) : (
+                <>
+                  <span className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground">
+                    {formatIDR(Number(product.price))}
+                  </span>
+                  {product.original_price && Number(product.original_price) > Number(product.price) && (
+                    <span className="text-xl md:text-2xl text-muted-foreground/60 line-through font-normal">
+                      {formatIDR(Number(product.original_price))}
+                    </span>
+                  )}
+                </>
               )}
             </div>
 
@@ -285,11 +305,10 @@ export default function ProductDetail() {
                     <button
                       key={s.id}
                       onClick={() => setSizeId(s.id)}
-                      className={`px-4 py-2 text-sm border text-left transition-colors ${
-                        s.id === sizeId
+                      className={`px-4 py-2 text-sm border text-left transition-colors ${s.id === sizeId
                           ? "border-primary bg-primary text-primary-foreground"
                           : "border-border text-foreground hover:border-primary"
-                      }`}
+                        }`}
                     >
                       {s.category}
                       <span className="block text-[11px] opacity-80">LD {s.ld} cm</span>
@@ -312,11 +331,10 @@ export default function ProductDetail() {
                       <button
                         key={m.id}
                         onClick={() => selectModel(m.id)}
-                        className={`px-4 py-2 text-sm border transition-colors ${
-                          m.id === modelId
+                        className={`px-4 py-2 text-sm border transition-colors ${m.id === modelId
                             ? "border-primary bg-primary text-primary-foreground"
                             : "border-border text-foreground hover:border-primary"
-                        }`}
+                          }`}
                       >
                         {m.name}
                       </button>
@@ -342,9 +360,8 @@ export default function ProductDetail() {
                             onClick={() => !out && selectMotif(mo)}
                             disabled={out}
                             title={mo.name}
-                            className={`relative border text-left transition-all ${
-                              mo.id === motifId ? "border-primary" : "border-border hover:border-primary"
-                            } ${out ? "opacity-40 cursor-not-allowed" : ""}`}
+                            className={`relative border text-left transition-all ${mo.id === motifId ? "border-primary" : "border-border hover:border-primary"
+                              } ${out ? "opacity-40 cursor-not-allowed" : ""}`}
                           >
                             <div className="aspect-square bg-[hsl(var(--warm-bg))] overflow-hidden">
                               <img
@@ -379,6 +396,15 @@ export default function ProductDetail() {
               <button disabled className="w-full py-3.5 bg-muted text-muted-foreground/80 text-sm font-medium cursor-not-allowed border border-border opacity-70">
                 Coming Soon
               </button>
+            ) : isPriceComingSoon ? (
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent(waText)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-3.5 bg-amber-700 text-white text-sm font-medium hover:bg-amber-800 transition-colors text-center block"
+              >
+                Tanya Info Rilis &amp; Ketersediaan via WhatsApp
+              </a>
             ) : needsChoice ? (
               <button disabled className="w-full py-3.5 bg-muted text-muted-foreground text-sm font-medium cursor-not-allowed">
                 Pilih size, model & motif terlebih dahulu
@@ -445,20 +471,30 @@ export default function ProductDetail() {
         <section className="max-w-6xl mx-auto px-4 md:px-6 py-12 md:py-16">
           <h2 className="text-xl md:text-2xl font-light text-foreground mb-6 md:mb-8">You Might Also Like</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-8">
-            {related.map((p, i) => (
-              <Link key={p.id} to={`/product/${p.slug}`} className="group block">
-                <div className="bg-[hsl(var(--warm-bg))] aspect-[4/5] overflow-hidden mb-3 md:mb-4">
-                  <img
-                    src={resolveProductImage(p.image_url, i % 2 === 0 ? "daster" : "pajamas")}
-                    alt={p.name}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    loading="lazy"
-                  />
-                </div>
-                <h3 className="text-sm md:text-base font-light text-foreground mb-1 truncate">{p.name}</h3>
-                <p className="text-sm text-muted-foreground">{formatIDR(Number(p.price))}</p>
-              </Link>
-            ))}
+            {related.map((p, i) => {
+              const relatedPriceComingSoon = isProductPriceComingSoon({
+                price: p.price,
+                price_status: p.price_status,
+                status: p.status,
+              });
+
+              return (
+                <Link key={p.id} to={`/product/${p.slug}`} className="group block">
+                  <div className="bg-[hsl(var(--warm-bg))] aspect-[4/5] overflow-hidden mb-3 md:mb-4">
+                    <img
+                      src={resolveProductImage(p.image_url, i % 2 === 0 ? "daster" : "pajamas")}
+                      alt={p.name}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      loading="lazy"
+                    />
+                  </div>
+                  <h3 className="text-sm md:text-base font-light text-foreground mb-1 truncate">{p.name}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {relatedPriceComingSoon ? "Coming Soon" : formatIDR(Number(p.price))}
+                  </p>
+                </Link>
+              );
+            })}
           </div>
         </section>
       )}

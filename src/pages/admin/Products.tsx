@@ -12,7 +12,7 @@ interface Category { id: string; name: string; }
 interface Product {
   id: string; name: string; slug: string; description: string | null;
   price: number; original_price: number | null; hpp_price: number; stock: number;
-  status: string | null; image_url: string | null;
+  status: string | null; price_status: string | null; image_url: string | null;
   image_urls: string[] | null; category_id: string | null;
 }
 
@@ -26,7 +26,7 @@ export default function Products() {
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState({
     name: "", slug: "", description: "", price: 0, original_price: 0, hpp_price: 0, stock: 0,
-    status: "ready", category_id: "", image_urls: [] as string[],
+    status: "ready", price_status: "active", category_id: "", image_urls: [] as string[],
   });
   const [uploading, setUploading] = useState(false);
   const { toast } = useToast();
@@ -47,7 +47,7 @@ export default function Products() {
     setEditing(null);
     setForm({
       name: "", slug: "", description: "", price: 0, original_price: 0, hpp_price: 0, stock: 0,
-      status: "ready", category_id: "", image_urls: []
+      status: "ready", price_status: "active", category_id: "", image_urls: []
     });
     setOpen(true);
   };
@@ -59,6 +59,7 @@ export default function Products() {
       name: p.name, slug: p.slug, description: p.description || "",
       price: Number(p.price), original_price: p.original_price ? Number(p.original_price) : 0,
       hpp_price: Number(p.hpp_price), stock: p.stock, status: p.status || "ready",
+      price_status: p.price_status || "active",
       category_id: p.category_id || "", image_urls: imgs.slice(0, MAX_IMAGES),
     });
     setOpen(true);
@@ -111,6 +112,7 @@ export default function Products() {
       hpp_price: form.hpp_price,
       stock: form.stock,
       status: form.status,
+      price_status: form.price_status,
       category_id: form.category_id || null,
       image_url: imgs[0] || null,
       image_urls: imgs,
@@ -180,9 +182,24 @@ export default function Products() {
                 </div>
                 <p className="text-xs text-muted-foreground truncate">{p.slug} · {imageCount(p)} img</p>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className="text-sm font-semibold">{formatIDR(Number(p.price))}</span>
-                  {p.original_price && Number(p.original_price) > Number(p.price) && (
-                    <span className="text-xs text-muted-foreground line-through">{formatIDR(Number(p.original_price))}</span>
+                  {p.price_status === "coming_soon" ? (
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                        Harga Coming Soon
+                      </span>
+                      {Number(p.price) > 0 && (
+                        <span className="text-xs text-muted-foreground font-mono">
+                          ({formatIDR(Number(p.price))})
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      <span className="text-sm font-semibold">{formatIDR(Number(p.price))}</span>
+                      {p.original_price && Number(p.original_price) > Number(p.price) && (
+                        <span className="text-xs text-muted-foreground line-through">{formatIDR(Number(p.original_price))}</span>
+                      )}
+                    </>
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -249,7 +266,22 @@ export default function Products() {
                       {st.label}
                     </span>
                   </td>
-                  <td className="px-4 py-3 font-semibold">{formatIDR(Number(p.price))}</td>
+                  <td className="px-4 py-3">
+                    {p.price_status === "coming_soon" ? (
+                      <div>
+                        <span className="inline-block text-xs px-2 py-0.5 font-medium rounded bg-amber-100 text-amber-800">
+                          Coming Soon
+                        </span>
+                        {Number(p.price) > 0 && (
+                          <div className="text-[11px] text-muted-foreground mt-0.5 font-mono">
+                            Draft: {formatIDR(Number(p.price))}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="font-semibold">{formatIDR(Number(p.price))}</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-muted-foreground">
                     {p.original_price && Number(p.original_price) > 0 ? (
                       <span className="line-through">{formatIDR(Number(p.original_price))}</span>
@@ -416,29 +448,54 @@ export default function Products() {
                       Harga, Status &amp; Stok
                     </p>
 
-                    {/* Status Picker */}
-                    <div>
-                      <label className="block text-xs uppercase tracking-wider font-medium text-muted-foreground mb-1">
-                        Status Produk
-                      </label>
-                      <select
-                        value={form.status}
-                        onChange={e => setForm(f => ({ ...f, status: e.target.value }))}
-                        className="w-full px-3 py-2 border border-border bg-background text-sm focus:outline-none focus:border-primary font-medium"
-                      >
-                        <option value="ready">Ready (Otomatis Sold jika Stok 0)</option>
-                        <option value="coming_soon">Coming Soon (Manual - Tombol Pesan Nonaktif)</option>
-                        <option value="sold">Sold Out (Habis)</option>
-                      </select>
-                      <p className="text-[11px] text-muted-foreground mt-1">
-                        * Jika memilih "Coming Soon", gambar produk tetap muncul namun tombol pesan di detail akan tidak dapat dipencet.
-                      </p>
+                    {/* Status Produk & Status/Opsi Harga */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs uppercase tracking-wider font-medium text-muted-foreground mb-1">
+                          Status Produk
+                        </label>
+                        <select
+                          value={form.status}
+                          onChange={e => setForm(f => ({ ...f, status: e.target.value }))}
+                          className="w-full px-3 py-2 border border-border bg-background text-sm focus:outline-none focus:border-primary font-medium"
+                        >
+                          <option value="ready">Ready (Otomatis Sold jika Stok 0)</option>
+                          <option value="coming_soon">Coming Soon (Manual - Tombol Pesan Nonaktif)</option>
+                          <option value="sold">Sold Out (Habis)</option>
+                        </select>
+                        <p className="text-[11px] text-muted-foreground mt-1">
+                          * Status ketersediaan produk di toko.
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs uppercase tracking-wider font-medium text-muted-foreground mb-1">
+                          Status / Opsi Harga
+                        </label>
+                        <select
+                          value={form.price_status}
+                          onChange={e => setForm(f => ({ ...f, price_status: e.target.value }))}
+                          className="w-full px-3 py-2 border border-border bg-background text-sm focus:outline-none focus:border-primary font-medium"
+                        >
+                          <option value="active">Tampilkan Harga Nominal</option>
+                          <option value="coming_soon">Coming Soon (Harga Belum Rilis)</option>
+                        </select>
+                        <p className="text-[11px] text-muted-foreground mt-1">
+                          * Tampilkan harga nominal atau label Coming Soon.
+                        </p>
+                      </div>
                     </div>
+
+                    {form.price_status === "coming_soon" && (
+                      <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 text-xs text-amber-900 dark:text-amber-200">
+                        <span className="font-semibold">💡 Opsi Harga Coming Soon Aktif:</span> Pengunjung akan melihat label <strong>"Coming Soon"</strong> pada harga produk ini. Angka pada kolom Harga Jual di bawah bersifat opsional dan tetap dapat disimpan sebagai draft/estimasi internal.
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs uppercase tracking-wider font-medium text-muted-foreground mb-1">
-                          Harga Jual / Diskon (Rp)
+                          Harga Jual / Diskon (Rp) {form.price_status === "coming_soon" ? "(Draft Internal)" : ""}
                         </label>
                         <div className="relative">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium select-none">
@@ -447,18 +504,20 @@ export default function Products() {
                           <input
                             type="text"
                             inputMode="numeric"
-                            required
+                            required={form.price_status !== "coming_soon"}
                             value={form.price ? form.price.toLocaleString("id-ID") : ""}
                             onChange={e => {
                               const raw = e.target.value.replace(/\D/g, "");
                               setForm(f => ({ ...f, price: raw ? parseInt(raw, 10) : 0 }));
                             }}
-                            placeholder="0"
+                            placeholder={form.price_status === "coming_soon" ? "Opsional (Draft internal)" : "0"}
                             className="w-full pl-9 pr-3 py-2 border border-border bg-background text-sm font-semibold focus:outline-none focus:border-primary"
                           />
                         </div>
                         {form.price > 0 && (
-                          <p className="text-[11px] text-muted-foreground mt-1 font-mono">{formatIDR(form.price)}</p>
+                          <p className="text-[11px] text-muted-foreground mt-1 font-mono">
+                            {form.price_status === "coming_soon" ? "Draft: " : ""}{formatIDR(form.price)}
+                          </p>
                         )}
                       </div>
 

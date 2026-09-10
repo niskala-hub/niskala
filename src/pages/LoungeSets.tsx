@@ -12,6 +12,7 @@ interface DBProduct {
   price: number;
   original_price: number | null;
   status: string | null;
+  price_status: string | null;
   stock: number;
   image_url: string | null;
 }
@@ -34,7 +35,7 @@ export default function LoungeSets() {
       }
       const { data } = await supabase
         .from("products")
-        .select("id,slug,name,price,original_price,status,stock,image_url")
+        .select("id,slug,name,price,original_price,status,price_status,stock,image_url")
         .eq("category_id", cat.id)
         .order("created_at", { ascending: false });
       setProducts(data || []);
@@ -91,6 +92,7 @@ export default function LoungeSets() {
                   image: resolveProductImage(p.image_url, "pajamas"),
                   description: "",
                   status: (p.status as any) || "ready",
+                  price_status: p.price_status,
                   stock: p.stock,
                 }}
               />
