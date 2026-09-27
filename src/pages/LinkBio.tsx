@@ -80,7 +80,7 @@ export default function LinkBio() {
             NISKALA
           </h1>
           <p className="mt-3 text-sm text-muted-foreground max-w-xs">
-            Handcrafted knitwear for a considered life.
+            Premium homewear & casual wear for modern women.
           </p>
         </Link>
 
