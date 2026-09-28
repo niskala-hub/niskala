@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -11,6 +11,31 @@ export type Database = {
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.5"
+  }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -60,11 +85,9 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
-          /** TRUE jika transaksi ini adalah pembalik (reversal/credit note) */
           is_reversal: boolean
           receipt_url: string | null
           reference_id: string | null
-          /** FK ke cash_transactions.id — transaksi asal yang dibalik */
           reversed_by: string | null
           transaction_date: string
           type: Database["public"]["Enums"]["cash_flow_type"]
@@ -137,6 +160,8 @@ export type Database = {
           product_id: string | null
           product_name: string
           quantity: number
+          size_id: string | null
+          size_name: string | null
           unit_hpp: number
           unit_price: number
         }
@@ -147,6 +172,8 @@ export type Database = {
           product_id?: string | null
           product_name: string
           quantity?: number
+          size_id?: string | null
+          size_name?: string | null
           unit_hpp?: number
           unit_price?: number
         }
@@ -157,6 +184,8 @@ export type Database = {
           product_id?: string | null
           product_name?: string
           quantity?: number
+          size_id?: string | null
+          size_name?: string | null
           unit_hpp?: number
           unit_price?: number
         }
@@ -169,20 +198,32 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "v_order_profitability"
+            referencedColumns: ["order_id"]
+          },
+          {
             foreignKeyName: "order_items_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "order_items_size_id_fkey"
+            columns: ["size_id"]
+            isOneToOne: false
+            referencedRelation: "product_sizes"
+            referencedColumns: ["id"]
+          },
         ]
       }
       orders: {
         Row: {
-          /** Timestamp pembatalan order (audit trail) */
-          cancelled_at: string | null
-          /** Alasan pembatalan order */
           cancellation_reason: string | null
+          cancelled_at: string | null
           channel: string
           created_at: string
           customer_name: string | null
@@ -192,15 +233,14 @@ export type Database = {
           paid_at: string | null
           payment_status: string
           status: string
-          /** TRUE jika stok sudah dikurangi untuk order ini */
           stock_deducted: boolean
           total_hpp: number
           total_price: number
           updated_at: string
         }
         Insert: {
-          cancelled_at?: string | null
           cancellation_reason?: string | null
+          cancelled_at?: string | null
           channel?: string
           created_at?: string
           customer_name?: string | null
@@ -216,8 +256,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          cancelled_at?: string | null
           cancellation_reason?: string | null
+          cancelled_at?: string | null
           channel?: string
           created_at?: string
           customer_name?: string | null
@@ -350,28 +390,40 @@ export type Database = {
         Row: {
           category: Database["public"]["Enums"]["size_category"]
           created_at: string
+          hpp_price: number | null
           id: string
           ld: number
+          name: string | null
+          price: number | null
           product_id: string
           sort_order: number
+          stock: number
           updated_at: string
         }
         Insert: {
           category?: Database["public"]["Enums"]["size_category"]
           created_at?: string
+          hpp_price?: number | null
           id?: string
           ld?: number
+          name?: string | null
+          price?: number | null
           product_id: string
           sort_order?: number
+          stock?: number
           updated_at?: string
         }
         Update: {
           category?: Database["public"]["Enums"]["size_category"]
           created_at?: string
+          hpp_price?: number | null
           id?: string
           ld?: number
+          name?: string | null
+          price?: number | null
           product_id?: string
           sort_order?: number
+          stock?: number
           updated_at?: string
         }
         Relationships: [
@@ -446,21 +498,6 @@ export type Database = {
           },
         ]
       }
-      site_settings: {
-        Row: {
-          id: boolean
-          coming_soon_enabled: boolean
-        }
-        Insert: {
-          id?: boolean
-          coming_soon_enabled?: boolean
-        }
-        Update: {
-          id?: boolean
-          coming_soon_enabled?: boolean
-        }
-        Relationships: []
-      }
       profiles: {
         Row: {
           created_at: string
@@ -485,6 +522,21 @@ export type Database = {
           must_change_password?: boolean
           updated_at?: string
           username?: string | null
+        }
+        Relationships: []
+      }
+      site_settings: {
+        Row: {
+          coming_soon_enabled: boolean
+          id: boolean
+        }
+        Insert: {
+          coming_soon_enabled?: boolean
+          id?: boolean
+        }
+        Update: {
+          coming_soon_enabled?: boolean
+          id?: boolean
         }
         Relationships: []
       }
@@ -513,53 +565,109 @@ export type Database = {
     Views: {
       v_accounting_summary: {
         Row: {
-          /** Total kas masuk (semua kategori, bukan reversal) */
-          total_inflow: number
-          /** Total kas keluar (termasuk reversal) */
-          total_outflow: number
-          /** Total inflow khusus dari kategori Penjualan */
-          total_sales_inflow: number
-          /** Total nilai reversal (pembatalan) */
-          total_reversals: number
-          /** Saldo kas bersih: inflow - outflow */
-          net_cash: number
-          /** Total HPP dari order yang sudah lunas */
-          total_cogs_paid: number
-          /** Estimasi Laba Kotor = Inflow Penjualan - HPP Terjual */
-          gross_profit_estimate: number
-          /** Margin Laba Kotor dalam persen */
-          gross_margin_percent: number
+          gross_margin_percent: number | null
+          gross_profit_estimate: number | null
+          net_cash: number | null
+          total_cogs_paid: number | null
+          total_inflow: number | null
+          total_outflow: number | null
+          total_reversals: number | null
+          total_sales_inflow: number | null
         }
         Relationships: []
       }
       v_monthly_cash_flow: {
         Row: {
-          month: string
-          month_label: string
-          inflow: number
-          outflow: number
-          net: number
+          inflow: number | null
+          month: string | null
+          month_label: string | null
+          net: number | null
+          outflow: number | null
         }
         Relationships: []
       }
       v_order_profitability: {
         Row: {
-          order_id: string
+          channel: string | null
+          created_at: string | null
           customer_name: string | null
-          channel: string
-          status: string
-          payment_status: string
-          created_at: string
+          gross_margin_percent: number | null
+          gross_profit: number | null
+          order_id: string | null
           paid_at: string | null
-          total_price: number
-          total_hpp: number
-          gross_profit: number
-          gross_margin_percent: number
+          payment_status: string | null
+          status: string | null
+          total_hpp: number | null
+          total_price: number | null
+        }
+        Insert: {
+          channel?: string | null
+          created_at?: string | null
+          customer_name?: string | null
+          gross_margin_percent?: never
+          gross_profit?: never
+          order_id?: string | null
+          paid_at?: string | null
+          payment_status?: string | null
+          status?: string | null
+          total_hpp?: number | null
+          total_price?: number | null
+        }
+        Update: {
+          channel?: string | null
+          created_at?: string | null
+          customer_name?: string | null
+          gross_margin_percent?: never
+          gross_profit?: never
+          order_id?: string | null
+          paid_at?: string | null
+          payment_status?: string | null
+          status?: string | null
+          total_hpp?: number | null
+          total_price?: number | null
         }
         Relationships: []
       }
     }
     Functions: {
+      get_admin_dashboard_summary: { Args: never; Returns: Json }
+      get_order_report_breakdown: {
+        Args: {
+          p_channel?: string
+          p_end_date: string
+          p_payment_status?: string
+          p_period?: string
+          p_start_date: string
+        }
+        Returns: {
+          items_sold: number
+          order_count: number
+          period_bucket: string
+          total_cogs: number
+          total_profit: number
+          total_revenue: number
+        }[]
+      }
+      get_order_report_summary: {
+        Args: {
+          p_channel?: string
+          p_end_date?: string
+          p_payment_status?: string
+          p_start_date?: string
+        }
+        Returns: Json
+      }
+      get_top_selling_variants: {
+        Args: { p_end_date?: string; p_limit?: number; p_start_date?: string }
+        Returns: {
+          product_id: string
+          product_name: string
+          quantity_sold: number
+          size_name: string
+          total_profit: number
+          total_revenue: number
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -574,13 +682,15 @@ export type Database = {
       is_owner_or_coowner: { Args: { _user_id: string }; Returns: boolean }
       validate_order_stock: {
         Args: { p_order_id: string }
-        Returns: Array<{
+        Returns: {
+          available: number
+          is_sufficient: boolean
           product_id: string
           product_name: string
           requested: number
-          available: number
-          is_sufficient: boolean
-        }>
+          size_id: string
+          size_name: string
+        }[]
       }
     }
     Enums: {
@@ -712,6 +822,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       app_role: ["admin", "user", "owner", "co_owner"],

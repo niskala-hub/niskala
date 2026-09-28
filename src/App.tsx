@@ -25,6 +25,8 @@ import AdminBioLinks from "./pages/admin/BioLinks";
 import AdminUsers from "./pages/admin/Users";
 import AdminAccounting from "./pages/admin/Accounting";
 import AdminOrders from "./pages/admin/Orders";
+import AdminReports from "./pages/admin/Reports";
+import AdminStockReport from "./pages/admin/StockReport";
 import AdminProfile from "./pages/admin/Profile";
 import LinkBio from "./pages/LinkBio";
 import NotFound from "./pages/NotFound";
@@ -66,6 +68,8 @@ const App = () => (
                 <Route path="bio-links" element={<AdminBioLinks />} />
                 <Route path="accounting" element={<AdminAccounting />} />
                 <Route path="orders" element={<AdminOrders />} />
+                <Route path="reports" element={<AdminReports />} />
+                <Route path="stock-report" element={<AdminStockReport />} />
                 <Route path="profile" element={<AdminProfile />} />
                 <Route path="users" element={<AdminUsers />} />
               </Route>

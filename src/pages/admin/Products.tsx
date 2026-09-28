@@ -7,6 +7,7 @@ import { resolveProductImage } from "@/lib/productImage";
 import { getProductStatusInfo } from "@/lib/product";
 import ProductVariants from "@/components/admin/ProductVariants";
 import ProductSizes from "@/components/admin/ProductSizes";
+import RupiahInput from "@/components/ui/RupiahInput";
 
 interface Category { id: string; name: string; }
 interface Product {
@@ -307,7 +308,7 @@ export default function Products() {
 
       {open && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
-          <div className="bg-background w-full max-w-5xl rounded-none border border-border shadow-2xl relative my-auto max-h-[90vh] flex flex-col overflow-hidden">
+          <div className="bg-background w-full max-w-6xl rounded-none border border-border shadow-2xl relative my-auto max-h-[92vh] flex flex-col overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-border bg-background shrink-0">
               <div>
@@ -497,23 +498,12 @@ export default function Products() {
                         <label className="block text-xs uppercase tracking-wider font-medium text-muted-foreground mb-1">
                           Harga Jual / Diskon (Rp) {form.price_status === "coming_soon" ? "(Draft Internal)" : ""}
                         </label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium select-none">
-                            Rp
-                          </span>
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            required={form.price_status !== "coming_soon"}
-                            value={form.price ? form.price.toLocaleString("id-ID") : ""}
-                            onChange={e => {
-                              const raw = e.target.value.replace(/\D/g, "");
-                              setForm(f => ({ ...f, price: raw ? parseInt(raw, 10) : 0 }));
-                            }}
-                            placeholder={form.price_status === "coming_soon" ? "Opsional (Draft internal)" : "0"}
-                            className="w-full pl-9 pr-3 py-2 border border-border bg-background text-sm font-semibold focus:outline-none focus:border-primary"
-                          />
-                        </div>
+                        <RupiahInput
+                          required={form.price_status !== "coming_soon"}
+                          value={form.price}
+                          onChange={(val) => setForm((f) => ({ ...f, price: val ?? 0 }))}
+                          placeholder={form.price_status === "coming_soon" ? "Opsional (Draft internal)" : "0"}
+                        />
                         {form.price > 0 && (
                           <p className="text-[11px] text-muted-foreground mt-1 font-mono">
                             {form.price_status === "coming_soon" ? "Draft: " : ""}{formatIDR(form.price)}
@@ -525,22 +515,12 @@ export default function Products() {
                         <label className="block text-xs uppercase tracking-wider font-medium text-muted-foreground mb-1">
                           Harga Asli / Normal (Rp)
                         </label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium select-none">
-                            Rp
-                          </span>
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            value={form.original_price ? form.original_price.toLocaleString("id-ID") : ""}
-                            onChange={e => {
-                              const raw = e.target.value.replace(/\D/g, "");
-                              setForm(f => ({ ...f, original_price: raw ? parseInt(raw, 10) : 0 }));
-                            }}
-                            placeholder="Opsional (misal: 400.000)"
-                            className="w-full pl-9 pr-3 py-2 border border-border bg-background text-sm focus:outline-none focus:border-primary"
-                          />
-                        </div>
+                        <RupiahInput
+                          allowNull
+                          value={form.original_price}
+                          onChange={(val) => setForm((f) => ({ ...f, original_price: val ?? 0 }))}
+                          placeholder="Opsional (misal: 400.000)"
+                        />
                         {form.original_price > 0 ? (
                           <p className="text-[11px] text-muted-foreground mt-1 font-mono line-through">
                             {formatIDR(form.original_price)}
@@ -556,23 +536,12 @@ export default function Products() {
                         <label className="block text-xs uppercase tracking-wider font-medium text-muted-foreground mb-1">
                           HPP / Modal (Rp)
                         </label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium select-none">
-                            Rp
-                          </span>
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            required
-                            value={form.hpp_price ? form.hpp_price.toLocaleString("id-ID") : ""}
-                            onChange={e => {
-                              const raw = e.target.value.replace(/\D/g, "");
-                              setForm(f => ({ ...f, hpp_price: raw ? parseInt(raw, 10) : 0 }));
-                            }}
-                            placeholder="0"
-                            className="w-full pl-9 pr-3 py-2 border border-border bg-background text-sm focus:outline-none focus:border-primary"
-                          />
-                        </div>
+                        <RupiahInput
+                          required
+                          value={form.hpp_price}
+                          onChange={(val) => setForm((f) => ({ ...f, hpp_price: val ?? 0 }))}
+                          placeholder="0"
+                        />
                         {form.hpp_price > 0 && (
                           <p className="text-[11px] text-muted-foreground mt-1 font-mono">{formatIDR(form.hpp_price)}</p>
                         )}
@@ -580,7 +549,7 @@ export default function Products() {
 
                       <div>
                         <label className="block text-xs uppercase tracking-wider font-medium text-muted-foreground mb-1">
-                          Stock Total
+                          Stock Total Master
                         </label>
                         <input
                           type="number"
@@ -590,24 +559,45 @@ export default function Products() {
                           onChange={e => setForm(f => ({ ...f, stock: Number(e.target.value) }))}
                           className="w-full px-3 py-2 border border-border bg-background text-sm focus:outline-none focus:border-primary"
                         />
+                        <p className="text-[11px] text-muted-foreground mt-1">
+                          Auto-sinkron dari total stok varian ukuran jika ukuran ditambahkan
+                        </p>
                       </div>
                     </div>
                   </div>
-
-                  {editing ? (
-                    <div className="space-y-4">
-                      <ProductSizes productId={editing.id} />
-                      <ProductVariants productId={editing.id} />
-                    </div>
-                  ) : (
-                    <div className="border border-dashed border-border p-4 bg-muted/20 text-xs text-muted-foreground leading-relaxed">
-                      <p className="font-medium text-foreground mb-1">Pengaturan Ukuran, Model &amp; Motif</p>
-                      Simpan data utama produk terlebih dahulu, lalu opsi penambahan Size (LD), Model, dan Motif akan langsung dapat dikelola di form ini.
-                    </div>
-                  )}
                 </div>
 
               </div>
+
+              {/* FULL WIDTH: Variant & Size Management */}
+              {editing ? (
+                <div className="border-t border-border pt-6 space-y-6">
+                  <div className="bg-card border border-border p-5 rounded-lg shadow-sm">
+                    <ProductSizes
+                      productId={editing.id}
+                      masterPrice={form.price}
+                      masterHpp={form.hpp_price}
+                      onStockChange={async (totalStock) => {
+                        // 1. Update state form (tampilan UI)
+                        setForm(f => ({ ...f, stock: totalStock }));
+                        // 2. Auto-save langsung ke DB agar tidak perlu klik "Simpan"
+                        await supabase
+                          .from("products")
+                          .update({ stock: totalStock })
+                          .eq("id", editing.id);
+                      }}
+                    />
+                  </div>
+                  <div className="bg-card border border-border p-5 rounded-lg shadow-sm">
+                    <ProductVariants productId={editing.id} />
+                  </div>
+                </div>
+              ) : (
+                <div className="border border-dashed border-border p-5 bg-muted/20 text-xs text-muted-foreground leading-relaxed rounded-lg">
+                  <p className="font-semibold text-foreground text-sm mb-1">Pengaturan Ukuran, Stok Mandiri, Model &amp; Motif</p>
+                  Simpan data utama produk terlebih dahulu. Setelah tersimpan, panel pengelolaan Varian Ukuran (dengan stok &amp; harga mandiri), Model, dan Motif akan langsung terbuka di modal ini.
+                </div>
+              )}
             </form>
 
             {/* Sticky Footer Action Bar */}
