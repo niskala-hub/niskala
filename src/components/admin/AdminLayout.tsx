@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { NavLink, Navigate, Outlet, Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { LayoutDashboard, Package, Tags, LogOut, Store, Link2, Wallet, Users, Menu, X, ShoppingBag, UserCircle } from "lucide-react";
+import { LayoutDashboard, Package, Tags, LogOut, Store, Link2, Wallet, Users, Menu, X, ShoppingBag, UserCircle, BarChart3, ClipboardList } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function AdminLayout() {
@@ -49,6 +49,12 @@ export default function AdminLayout() {
         </NavLink>
         <NavLink to="/admin/orders" className={cls}>
           <ShoppingBag className="w-4 h-4" /> Orders
+        </NavLink>
+        <NavLink to="/admin/reports" className={cls}>
+          <BarChart3 className="w-4 h-4" /> Laporan
+        </NavLink>
+        <NavLink to="/admin/stock-report" className={cls}>
+          <ClipboardList className="w-4 h-4" /> Laporan Stok
         </NavLink>
         <NavLink to="/admin/accounting" className={cls}>
           <Wallet className="w-4 h-4" /> Accounting

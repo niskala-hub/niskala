@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatIDR } from "@/lib/currency";
 import { useToast } from "@/hooks/use-toast";
-import { ShoppingBag, Plus, Pencil, Trash2, X } from "lucide-react";
+import { ShoppingBag, Plus, Pencil, Trash2, X, FileText, Loader2 } from "lucide-react";
+import { generateNotaPDF } from "@/services/notaPdfService";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,7 +29,9 @@ import { createOrder } from "@/services/orderService";
 interface OrderItem {
   id: string;
   product_id: string | null;
+  size_id: string | null;
   product_name: string;
+  size_name: string | null;
   quantity: number;
   unit_price: number;
   unit_hpp: number;
@@ -52,16 +55,30 @@ interface Order {
   order_items: OrderItem[];
 }
 
+interface ProductSizeOption {
+  id: string;
+  category: string;
+  name: string | null;
+  ld: number;
+  stock: number;
+  price: number | null;
+  hpp_price: number | null;
+}
+
 interface ProductOption {
   id: string;
   name: string;
   price: number;
   hpp_price: number;
+  stock: number;
+  product_sizes?: ProductSizeOption[];
 }
 
 interface DraftItem {
   product_id: string;
+  size_id: string; // 'none' or size id
   product_name: string;
+  size_name: string;
   quantity: string;
   unit_price: string;
   unit_hpp: string;
@@ -92,7 +109,9 @@ const todayStr = () => new Date().toISOString().slice(0, 10);
 
 const emptyItem: DraftItem = {
   product_id: "manual",
+  size_id: "none",
   product_name: "",
+  size_name: "",
   quantity: "1",
   unit_price: "",
   unit_hpp: "0",
@@ -133,10 +152,13 @@ export default function Orders() {
       supabase
         .from("orders")
         .select(
-          "id, customer_name, customer_phone, status, payment_status, channel, notes, paid_at, cancelled_at, cancellation_reason, stock_deducted, total_price, total_hpp, created_at, order_items(id, product_id, product_name, quantity, unit_price, unit_hpp)"
+          "id, customer_name, customer_phone, status, payment_status, channel, notes, paid_at, cancelled_at, cancellation_reason, stock_deducted, total_price, total_hpp, created_at, order_items(id, product_id, size_id, product_name, size_name, quantity, unit_price, unit_hpp)"
         )
         .order("created_at", { ascending: false }),
-      supabase.from("products").select("id, name, price, hpp_price").order("name"),
+      supabase
+        .from("products")
+        .select("id, name, price, hpp_price, stock, product_sizes(id, category, name, ld, stock, price, hpp_price)")
+        .order("name"),
     ]);
     if (ordersRes.error) {
       toast({ title: "Gagal memuat pesanan", description: ordersRes.error.message, variant: "destructive" });
@@ -203,7 +225,9 @@ export default function Orders() {
         o.order_items?.length > 0
           ? o.order_items.map((it) => ({
               product_id: it.product_id ?? "manual",
+              size_id: it.size_id ?? "none",
               product_name: it.product_name,
+              size_name: it.size_name ?? "",
               quantity: String(it.quantity),
               unit_price: String(it.unit_price),
               unit_hpp: String(it.unit_hpp),
@@ -222,16 +246,48 @@ export default function Orders() {
 
   const pickProduct = (index: number, productId: string) => {
     if (productId === "manual") {
-      setItem(index, { product_id: "manual" });
+      setItem(index, { product_id: "manual", size_id: "none", size_name: "" });
       return;
     }
     const p = products.find((x) => x.id === productId);
     if (!p) return;
     setItem(index, {
       product_id: p.id,
+      size_id: "none",
+      size_name: "",
       product_name: p.name,
       unit_price: String(Number(p.price)),
       unit_hpp: String(Number(p.hpp_price)),
+    });
+  };
+
+  const pickSize = (index: number, sizeId: string) => {
+    const item = draft.items[index];
+    const p = products.find((x) => x.id === item.product_id);
+    if (!p) return;
+
+    if (sizeId === "none") {
+      setItem(index, {
+        size_id: "none",
+        size_name: "",
+        unit_price: String(Number(p.price)),
+        unit_hpp: String(Number(p.hpp_price)),
+      });
+      return;
+    }
+
+    const s = p.product_sizes?.find((sz) => sz.id === sizeId);
+    if (!s) return;
+
+    const effPrice = s.price !== null ? Number(s.price) : Number(p.price);
+    const effHpp = s.hpp_price !== null ? Number(s.hpp_price) : Number(p.hpp_price);
+    const szLabel = `${s.name ? `${s.name} - ` : ""}${s.category} (LD ${s.ld}cm)`;
+
+    setItem(index, {
+      size_id: s.id,
+      size_name: szLabel,
+      unit_price: String(effPrice),
+      unit_hpp: String(effHpp),
     });
   };
 
@@ -246,7 +302,9 @@ export default function Orders() {
     const items = draft.items
       .map((it) => ({
         product_id: it.product_id === "manual" ? null : it.product_id,
+        size_id: it.size_id && it.size_id !== "none" ? it.size_id : null,
         product_name: it.product_name.trim(),
+        size_name: it.size_name.trim() || null,
         quantity: Number(it.quantity) || 0,
         unit_price: Number(it.unit_price) || 0,
         unit_hpp: Number(it.unit_hpp) || 0,
@@ -309,7 +367,9 @@ export default function Orders() {
           order_date: draft.order_date,
           items: items.map((it) => ({
             product_id: it.product_id,
+            size_id: it.size_id,
             product_name: it.product_name,
+            size_name: it.size_name,
             quantity: it.quantity,
             unit_price: it.unit_price,
             unit_hpp: it.unit_hpp,
@@ -400,6 +460,31 @@ export default function Orders() {
     }
     toast({ title: "Pesanan dihapus" });
     load();
+  };
+
+  const [downloadingNotaId, setDownloadingNotaId] = useState<string | null>(null);
+
+  const handleDownloadNota = async (o: Order) => {
+    try {
+      setDownloadingNotaId(o.id);
+      toast({
+        title: "Menyiapkan Nota PDF...",
+        description: `Memproses nota untuk ${o.customer_name || `#${o.id.slice(0, 8)}`}...`,
+      });
+      await generateNotaPDF(o);
+      toast({
+        title: "Nota berhasil diunduh",
+        description: "File PDF nota pesanan telah disimpan ke perangkat Anda.",
+      });
+    } catch (err: any) {
+      toast({
+        title: "Gagal membuat nota",
+        description: err?.message || "Terjadi kesalahan saat mencetak nota PDF.",
+        variant: "destructive",
+      });
+    } finally {
+      setDownloadingNotaId(null);
+    }
   };
 
   const paidBadge = (o: Order) => (
@@ -528,6 +613,21 @@ export default function Orders() {
                   <Button size="sm" variant="outline" className="text-xs" onClick={() => togglePayment(o)}>
                     {o.payment_status === "paid" ? "Tandai belum lunas" : "Tandai lunas"}
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-xs gap-1.5 border-[#D3B973]/70 text-[#8C6D23] hover:bg-[#D3B973]/15 hover:border-[#D3B973] hover:text-[#7A5E1B] transition-colors"
+                    onClick={() => handleDownloadNota(o)}
+                    disabled={downloadingNotaId === o.id}
+                    title="Cetak Nota PDF"
+                  >
+                    {downloadingNotaId === o.id ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-[#D3B973]" />
+                    ) : (
+                      <FileText className="w-3.5 h-3.5 text-[#D3B973]" />
+                    )}
+                    Nota
+                  </Button>
                   <Button size="icon" variant="ghost" onClick={() => openEdit(o)} aria-label="Ubah pesanan">
                     <Pencil className="w-4 h-4" />
                   </Button>
@@ -541,7 +641,15 @@ export default function Orders() {
                 <ul className="mt-3 pt-3 border-t border-border space-y-1">
                   {o.order_items.map((it) => (
                     <li key={it.id} className="flex justify-between gap-4 text-xs text-muted-foreground">
-                      <span className="truncate">{it.product_name} × {it.quantity}</span>
+                      <span className="truncate">
+                        {it.product_name}
+                        {it.size_name && (
+                          <span className="ml-1.5 px-1.5 py-0.5 rounded bg-muted text-[11px] font-medium text-foreground">
+                            {it.size_name}
+                          </span>
+                        )}
+                        {" "}× {it.quantity}
+                      </span>
                       <span className="shrink-0">{formatIDR(Number(it.unit_price) * it.quantity)}</span>
                     </li>
                   ))}
@@ -655,6 +763,41 @@ export default function Orders() {
                         <Trash2 className="w-4 h-4 text-red-600" />
                       </Button>
                     </div>
+                    {(() => {
+                      const prod = products.find((p) => p.id === it.product_id);
+                      const prodSizes = prod?.product_sizes || [];
+                      if (prodSizes.length === 0) return null;
+                      return (
+                        <div className="bg-muted/30 p-2 border border-border/60 rounded-sm">
+                          <Label className="text-[10px] font-medium text-foreground">
+                            Pilih Ukuran / Varian (Stok & Harga Khusus)
+                          </Label>
+                          <Select
+                            value={it.size_id || "none"}
+                            onValueChange={(szId) => pickSize(i, szId)}
+                          >
+                            <SelectTrigger className="bg-background text-xs mt-1">
+                              <SelectValue placeholder="Pilih ukuran" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">Tanpa ukuran khusus (Standar master)</SelectItem>
+                              {prodSizes.map((s) => (
+                                <SelectItem key={s.id} value={s.id}>
+                                  {s.name ? `${s.name} - ` : ""}{s.category} (LD {s.ld}cm)
+                                  {s.price ? ` · ${formatIDR(Number(s.price))}` : ""}
+                                  {` · Sisa Stok: ${s.stock} pcs`}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {it.size_name && (
+                            <p className="text-[10px] text-muted-foreground mt-1">
+                              Ukuran terpilih: <span className="font-medium text-foreground">{it.size_name}</span>
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })()}
                     <div>
                       <Label className="text-[10px] text-muted-foreground">Nama item</Label>
                       <Input
@@ -712,11 +855,32 @@ export default function Orders() {
               <span className="font-medium">{formatIDR(draftTotals.price)}</span>
             </div>
 
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setDialogOpen(false)}>Batal</Button>
-              <Button onClick={save} disabled={saving}>
-                {saving ? "Menyimpan…" : editing ? "Simpan perubahan" : "Simpan pesanan"}
-              </Button>
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border">
+              <div>
+                {editing && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 border-[#D3B973]/70 text-[#8C6D23] hover:bg-[#D3B973]/15 hover:border-[#D3B973] hover:text-[#7A5E1B] text-xs"
+                    onClick={() => handleDownloadNota(editing)}
+                    disabled={downloadingNotaId === editing.id}
+                  >
+                    {downloadingNotaId === editing.id ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-[#D3B973]" />
+                    ) : (
+                      <FileText className="w-3.5 h-3.5 text-[#D3B973]" />
+                    )}
+                    Cetak Nota PDF
+                  </Button>
+                )}
+              </div>
+              <div className="flex gap-2 ml-auto">
+                <Button variant="outline" onClick={() => setDialogOpen(false)}>Batal</Button>
+                <Button onClick={save} disabled={saving}>
+                  {saving ? "Menyimpan…" : editing ? "Simpan perubahan" : "Simpan pesanan"}
+                </Button>
+              </div>
             </div>
           </div>
         </DialogContent>

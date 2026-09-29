@@ -31,8 +31,12 @@ export type OrderChannel = "offline" | "online";
 export interface OrderItemDraft {
   /** FK ke products.id — null jika produk sudah dihapus */
   product_id: string | null;
+  /** FK ke product_sizes.id — null jika item tidak memilih size */
+  size_id?: string | null;
   /** Snapshot nama produk saat transaksi */
   product_name: string;
+  /** Snapshot nama / label size saat transaksi */
+  size_name?: string | null;
   quantity: number;
   /** Snapshot harga jual saat transaksi */
   unit_price: number;
@@ -75,7 +79,9 @@ export interface OrderWithItems extends OrderRow {
   order_items: Array<{
     id: string;
     product_id: string | null;
+    size_id: string | null;
     product_name: string;
+    size_name: string | null;
     quantity: number;
     unit_price: number;
     unit_hpp: number;
@@ -137,14 +143,16 @@ export async function createOrder(input: CreateOrderInput) {
 
   if (orderError) throw orderError;
 
-  // 2. Insert order items (with HPP snapshot)
+  // 2. Insert order items (with HPP snapshot & size variant)
   const { data: items, error: itemsError } = await supabase
     .from("order_items")
     .insert(
       input.items.map((item) => ({
         order_id: order.id,
         product_id: item.product_id,
+        size_id: item.size_id ?? null,
         product_name: item.product_name,
+        size_name: item.size_name ?? null,
         quantity: item.quantity,
         unit_price: item.unit_price,
         unit_hpp: item.unit_hpp,

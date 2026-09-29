@@ -30,12 +30,23 @@ export interface ProductRow {
   updated_at: string;
 }
 
+export interface ProductSizeOption {
+  id: string;
+  category: string;
+  name: string | null;
+  ld: number;
+  stock: number;
+  price: number | null;
+  hpp_price: number | null;
+}
+
 export interface ProductForOrder {
   id: string;
   name: string;
   price: number;
   hpp_price: number;
   stock: number;
+  product_sizes?: ProductSizeOption[];
 }
 
 export type ProductFilters = {
@@ -66,7 +77,7 @@ export async function fetchProducts(filters: ProductFilters = {}) {
 
   let query = supabase
     .from("products")
-    .select("*", { count: "exact" })
+    .select("*, product_sizes(id, category, name, ld, stock, price, hpp_price)", { count: "exact" })
     .order("name", { ascending: true })
     .range((page - 1) * pageSize, page * pageSize - 1);
 
@@ -78,22 +89,21 @@ export async function fetchProducts(filters: ProductFilters = {}) {
   const { data, error, count } = await query;
 
   if (error) throw error;
-  return { products: (data ?? []) as ProductRow[], count: count ?? 0 };
+  return { products: (data ?? []) as unknown as ProductRow[], count: count ?? 0 };
 }
 
 /**
  * Ambil produk ringkas untuk dropdown Order Form.
- * Hanya field yang dibutuhkan: id, name, price, hpp_price, stock.
+ * Field yang dibutuhkan: id, name, price, hpp_price, stock, plus product_sizes.
  */
 export async function fetchProductsForOrder(): Promise<ProductForOrder[]> {
   const { data, error } = await supabase
     .from("products")
-    .select("id, name, price, hpp_price, stock")
-    .gt("stock", 0) // Hanya tampilkan yang ada stok
+    .select("id, name, price, hpp_price, stock, product_sizes(id, category, name, ld, stock, price, hpp_price)")
     .order("name", { ascending: true });
 
   if (error) throw error;
-  return (data ?? []) as ProductForOrder[];
+  return (data ?? []) as unknown as ProductForOrder[];
 }
 
 /**

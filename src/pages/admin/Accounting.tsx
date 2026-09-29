@@ -4,6 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { formatIDR } from "@/lib/currency";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { getNiskalaLogoPng, PDF_COLORS, drawReportHeader, drawReportFooters } from "@/lib/pdfTheme";
 import {
   Wallet,
   TrendingUp,
@@ -364,21 +365,29 @@ export default function Accounting() {
     toast({ title: "CSV berhasil diunduh" });
   };
 
-  const exportPDF = () => {
+  const exportPDF = async () => {
     if (filtered.length === 0) {
       toast({ title: "Tidak ada data untuk diekspor", variant: "destructive" });
       return;
     }
-    const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
-    doc.setFontSize(16);
-    doc.text("Buku Kas NISKALA", 40, 40);
-    doc.setFontSize(9);
-    doc.setTextColor(110);
-    doc.text(filterLabel(), 40, 58);
-    doc.text(`Dicetak: ${formatDate(new Date().toISOString())}`, 40, 72);
+    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4", compress: true });
+    const logoPng = await getNiskalaLogoPng();
+
+    const startY = drawReportHeader(doc, {
+      logoPng,
+      title: "Buku Kas & Keuangan",
+      subtitle: filterLabel(),
+      rightInfo: [
+        "LAPORAN KAS NISKALA",
+        `Dicetak: ${formatDate(new Date().toISOString())}`,
+      ],
+      marginX: 14,
+      topY: 10,
+    });
 
     autoTable(doc, {
-      startY: 90,
+      startY: startY + 2,
+      margin: { left: 14, right: 14 },
       head: [["Tanggal", "Tipe", "Kategori", "Keterangan", "Nominal"]],
       body: filtered.map((t) => [
         formatDate(t.transaction_date),
@@ -387,16 +396,44 @@ export default function Accounting() {
         t.description ?? "-",
         `${t.type === "inflow" ? "+" : "-"} ${formatIDR(Number(t.amount))}`,
       ]),
-      styles: { fontSize: 9, cellPadding: 5 },
-      headStyles: { fillColor: [51, 44, 43], textColor: 255 },
-      columnStyles: { 4: { halign: "right" } },
+      styles: {
+        fontSize: 8,
+        cellPadding: 3,
+        textColor: PDF_COLORS.textDark,
+        lineColor: PDF_COLORS.champagne,
+        lineWidth: 0.2,
+      },
+      headStyles: {
+        fillColor: PDF_COLORS.champagne,
+        textColor: PDF_COLORS.textDark,
+        fontStyle: "bold",
+        fontSize: 8,
+        cellPadding: 3.5,
+      },
+      alternateRowStyles: {
+        fillColor: PDF_COLORS.champagneLight,
+      },
+      columnStyles: {
+        0: { cellWidth: 26 },
+        1: { cellWidth: 20 },
+        2: { cellWidth: 38 },
+        3: { cellWidth: "auto" },
+        4: { cellWidth: 40, halign: "right" },
+      },
       foot: [
         ["", "", "", "Total Pemasukan", formatIDR(filteredTotals.inflow)],
         ["", "", "", "Total Pengeluaran", formatIDR(filteredTotals.outflow)],
         ["", "", "", "Saldo Bersih", formatIDR(filteredTotals.net)],
       ],
-      footStyles: { fillColor: [245, 243, 240], textColor: 40, halign: "right" },
+      footStyles: {
+        fillColor: PDF_COLORS.champagneLight,
+        textColor: PDF_COLORS.textDark,
+        fontStyle: "bold",
+        halign: "right",
+      },
     });
+
+    drawReportFooters(doc, { reportName: "Buku Kas NISKALA" });
 
     doc.save(`${fileSlug()}.pdf`);
     toast({ title: "PDF berhasil diunduh" });

@@ -39,7 +39,10 @@ interface Model {
 interface Size {
   id: string;
   category: string;
+  name: string | null;
   ld: number;
+  stock: number;
+  price: number | null;
   sort_order: number;
 }
 
@@ -105,7 +108,7 @@ export default function ProductDetail() {
           .limit(3),
         supabase
           .from("product_sizes")
-          .select("id,category,ld,sort_order")
+          .select("id,category,name,ld,stock,price,sort_order")
           .eq("product_id", data.id)
           .order("sort_order"),
       ]);
@@ -144,6 +147,7 @@ export default function ProductDetail() {
     .slice(0, 5);
 
   const selectedSize = sizes.find(s => s.id === sizeId) || null;
+  const effectivePrice = Number(selectedSize?.price ?? product.price);
   const hasVariants = models.length > 0;
   const needsChoice =
     (hasVariants && (!modelId || (motifs.length > 0 && !motifId))) || (sizes.length > 0 && !sizeId);
@@ -153,7 +157,8 @@ export default function ProductDetail() {
     stock: product.stock,
   });
 
-  const isSoldOut = statusInfo.isSold || (selectedMotif ? selectedMotif.stock <= 0 : false);
+  const isSizeSoldOut = selectedSize ? selectedSize.stock <= 0 : false;
+  const isSoldOut = statusInfo.isSold || (selectedMotif ? selectedMotif.stock <= 0 : false) || isSizeSoldOut;
   const isComingSoon = statusInfo.isComingSoon;
   const isPriceComingSoon = isProductPriceComingSoon({
     price: product.price,
@@ -163,13 +168,18 @@ export default function ProductDetail() {
 
   const productUrl =
     typeof window !== "undefined" ? `${window.location.origin}/product/${product.slug}` : "";
+  
+  const sizeLabel = selectedSize
+    ? `${selectedSize.name ? `${selectedSize.name} - ` : ""}${selectedSize.category} (LD ${selectedSize.ld} cm)`
+    : "";
+
   const waText = isPriceComingSoon
     ? `Halo NISKALA, saya ingin menanyakan info rilis & ketersediaan:\n\n${product.name}${selectedModel ? `\nModel: ${selectedModel.name}` : ""
-    }${selectedMotif ? `\nMotif: ${selectedMotif.name}` : ""}${selectedSize ? `\nSize: ${selectedSize.category} (LD ${selectedSize.ld} cm)` : ""
+    }${selectedMotif ? `\nMotif: ${selectedMotif.name}` : ""}${sizeLabel ? `\nSize: ${sizeLabel}` : ""
     }\nHarga: Coming Soon\n${productUrl}`
     : `Halo NISKALA, saya ingin memesan:\n\n${product.name}${selectedModel ? `\nModel: ${selectedModel.name}` : ""
-    }${selectedMotif ? `\nMotif: ${selectedMotif.name}` : ""}${selectedSize ? `\nSize: ${selectedSize.category} (LD ${selectedSize.ld} cm)` : ""
-    }\n${productUrl}`;
+    }${selectedMotif ? `\nMotif: ${selectedMotif.name}` : ""}${sizeLabel ? `\nSize: ${sizeLabel}` : ""
+    }\nHarga: ${formatIDR(effectivePrice)}\n${productUrl}`;
 
   const selectModel = (id: string) => {
     setModelId(id);
@@ -257,31 +267,43 @@ export default function ProductDetail() {
             </h1>
 
             {/* Price section: Discount price (normal) & Original price (strikethrough) */}
-            <div className="flex items-baseline gap-3 mb-4 md:mb-6">
-              {isPriceComingSoon ? (
-                <div className="flex flex-wrap items-center gap-3">
-                  <span className="text-3xl md:text-4xl lg:text-5xl font-bold text-amber-700 tracking-wide uppercase">
-                    Coming Soon
-                  </span>
-                  <span className="text-xs uppercase tracking-wider px-2.5 py-1 rounded bg-amber-100 text-amber-800 font-medium">
-                    Harga Segera Rilis
-                  </span>
-                </div>
-              ) : (
-                <>
-                  <span className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground">
-                    {formatIDR(Number(product.price))}
-                  </span>
-                  {product.original_price && Number(product.original_price) > Number(product.price) && (
-                    <span className="text-xl md:text-2xl text-muted-foreground/60 line-through font-normal">
-                      {formatIDR(Number(product.original_price))}
+            <div className="flex flex-col gap-1 mb-4 md:mb-6">
+              <div className="flex items-baseline gap-3">
+                {isPriceComingSoon ? (
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="text-3xl md:text-4xl lg:text-5xl font-bold text-amber-700 tracking-wide uppercase">
+                      Coming Soon
                     </span>
-                  )}
-                </>
+                    <span className="text-xs uppercase tracking-wider px-2.5 py-1 rounded bg-amber-100 text-amber-800 font-medium">
+                      Harga Segera Rilis
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    <span className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground">
+                      {formatIDR(effectivePrice)}
+                    </span>
+                    {product.original_price && Number(product.original_price) > effectivePrice && (
+                      <span className="text-xl md:text-2xl text-muted-foreground/60 line-through font-normal">
+                        {formatIDR(Number(product.original_price))}
+                      </span>
+                    )}
+                  </>
+                )}
+              </div>
+              {selectedSize?.price && Number(selectedSize.price) !== Number(product.price) && (
+                <p className="text-xs text-muted-foreground">
+                  * Harga khusus varian {selectedSize.name ? `${selectedSize.name} (${selectedSize.category})` : selectedSize.category}
+                </p>
               )}
             </div>
 
-            {!isSoldOut && !isComingSoon && product.stock > 0 && product.stock <= 5 && !selectedMotif && (
+            {selectedSize && selectedSize.stock > 0 && selectedSize.stock <= 5 && (
+              <p className="text-sm text-accent font-medium mb-4">
+                Hanya tersisa {selectedSize.stock} pcs untuk ukuran {selectedSize.name ?? selectedSize.category}
+              </p>
+            )}
+            {!selectedSize && !isSoldOut && !isComingSoon && product.stock > 0 && product.stock <= 5 && !selectedMotif && (
               <p className="text-sm text-accent font-medium mb-4">Hanya {product.stock} tersedia</p>
             )}
             {product.description && (
@@ -296,24 +318,48 @@ export default function ProductDetail() {
                   Pilih Size
                   {selectedSize && (
                     <span className="ml-2 normal-case tracking-normal text-foreground">
-                      {selectedSize.category} · LD {selectedSize.ld} cm
+                      {selectedSize.name ? `${selectedSize.name} (${selectedSize.category})` : selectedSize.category} · LD {selectedSize.ld} cm
+                      {selectedSize.stock <= 0 && <span className="ml-2 text-xs font-semibold text-destructive">(Stok Habis)</span>}
                     </span>
                   )}
                 </p>
-                <div className="flex flex-wrap gap-2">
-                  {sizes.map(s => (
-                    <button
-                      key={s.id}
-                      onClick={() => setSizeId(s.id)}
-                      className={`px-4 py-2 text-sm border text-left transition-colors ${s.id === sizeId
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-border text-foreground hover:border-primary"
+                <div className="flex flex-wrap gap-2.5">
+                  {sizes.map(s => {
+                    const isOutOfStock = s.stock <= 0;
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => setSizeId(s.id)}
+                        className={`px-3.5 py-2 text-sm border text-left transition-colors relative min-w-[100px] ${
+                          s.id === sizeId
+                            ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                            : isOutOfStock
+                            ? "border-border/60 text-muted-foreground/60 bg-muted/40 hover:border-border"
+                            : "border-border text-foreground hover:border-primary"
                         }`}
-                    >
-                      {s.category}
-                      <span className="block text-[11px] opacity-80">LD {s.ld} cm</span>
-                    </button>
-                  ))}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-medium">
+                            {s.name ? `${s.name} (${s.category})` : s.category}
+                          </span>
+                          {isOutOfStock && (
+                            <span className={`text-[10px] uppercase font-bold px-1 py-0.5 rounded ${
+                              s.id === sizeId ? "bg-primary-foreground/20 text-primary-foreground" : "bg-destructive/10 text-destructive"
+                            }`}>
+                              Habis
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between gap-2 text-[11px] opacity-80 mt-0.5">
+                          <span>LD {s.ld} cm</span>
+                          {s.price && Number(s.price) !== Number(product.price) && (
+                            <span className="font-medium">{formatIDR(Number(s.price))}</span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
